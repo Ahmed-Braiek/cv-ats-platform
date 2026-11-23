@@ -41,7 +41,14 @@ jobs:
       - name: Flutter widget tests
         run: flutter test
       - name: Build debug Android APK
-        run: flutter build apk --debug
+        env:
+          SUPABASE_URL: https://uqtyxhkevnyjvhwdgkyh.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_MlF4aPhLVfhgv5h_Cc2K_Q_20CiDaWw
+        run: |
+          test -n "$SUPABASE_PUBLISHABLE_KEY"
+          flutter build apk --debug \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - name: Retain test APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
