@@ -1,0 +1,79 @@
+name: Flutter release builds
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/flutter-release-builds.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Flutter Android APK and Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: stable
+          cache: true
+      - name: Generate Android and Web platform files
+        run: flutter create --platforms=android,web --project-name cv_ats_mobile .
+      - name: Resolve packages
+        run: flutter pub get
+      - name: Analyze Flutter source
+        run: flutter analyze --no-fatal-infos
+      - name: Widget tests
+        run: flutter test
+      - name: Build Flutter web release
+        run: |
+          flutter build web --release \
+            --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
+            --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
+            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+      - name: Build installable Android test APK
+        run: |
+          flutter build apk --debug \
+            --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
+            --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
+            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+      - name: Upload Android APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cv-ats-android-debug-apk
+          path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload Web release build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cv-ats-web-release
+          path: apps/mobile/build/web/
+          retention-days: 7
+          if-no-files-found: error
