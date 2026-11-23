@@ -31,7 +31,7 @@ void main() {
     expect(find.text('Welcome back'), findsOneWidget);
   });
 
-  testWidgets('verification code screen offers one pasteable six-digit field',
+  testWidgets('verification code input accepts configured lengths from 6 to 10',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: VerificationCodeScreen(email: 'test@example.com'),
@@ -39,9 +39,27 @@ void main() {
     expect(find.text('Check your inbox.'), findsOneWidget);
     expect(find.text('test@example.com'), findsOneWidget);
     expect(find.text('Verification code'), findsOneWidget);
-    final input = tester.widget<TextField>(find.byType(TextField));
-    expect(input.maxLength, 6);
-    expect(find.text('Verify and continue'), findsOneWidget);
+    final field = find.byType(TextField);
+    expect(tester.widget<TextField>(field).maxLength, 10);
+
+    FilledButton verifyButton() => tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Verify and continue'),
+    );
+
+    expect(verifyButton().onPressed, isNull);
+    await tester.enterText(field, '12345');
+    await tester.pump();
+    expect(verifyButton().onPressed, isNull);
+
+    await tester.enterText(field, '12345678');
+    await tester.pump();
+    expect(tester.widget<TextField>(field).controller?.text, '12345678');
+    expect(verifyButton().onPressed, isNotNull);
+
+    await tester.enterText(field, '1234567890');
+    await tester.pump();
+    expect(tester.widget<TextField>(field).controller?.text, '1234567890');
+    expect(verifyButton().onPressed, isNotNull);
   });
 
   testWidgets('analysis remains gated before the worker is verified',
