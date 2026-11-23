@@ -11,7 +11,7 @@ Reference: supplied screenshot 'Group 1.png' (visitor, candidate, admin, respons
 - Dark mode, accessible contrast, scalable text, minimum 48dp hit targets, explicit focus order, semantic labels and non-color error messages.
 - Every network page includes **loading, empty, error, retry, success** states; no fabricated scores, testimonials, payment success or user statistics.
 - Separate, **explainable** ATS Score and Job Match; no hiring probability.
-- Users may explore without login; personal data and full results require authentication.
+- **Authentication-first release:** launch opens Sign in / Create account tabs, or jumps to the dashboard on a restored session. The previous visitor landing is removed; anonymous analysis remains a future workflow.
 - All API errors should be turned into actionable, non-technical messages.
 - Progressive disclosure: Overview → breakdown → recommendations. Persist analysis progress so users can leave/re-enter.
 
@@ -19,13 +19,13 @@ Reference: supplied screenshot 'Group 1.png' (visitor, candidate, admin, respons
 
 | Screen | User experience | Implementation state |
 | --- | --- | --- |
-| Landing / product intro | Clear headline, ATS vs Job Match explanation, primary Analyze CTA, sign-in CTA | UI coded |
+| Initial app launch | Sign in / Create account tabs; existing session goes straight to workspace | UI coded and widget-tested |
 | New Analysis | CV file picker + job description, validation, upload progress | UI coded for authenticated upload |
 | Processing steps | Input validation, extraction, scoring, recommendations, result readiness | Polling and status UI coded; no fine-grained step display yet |
 | Public preview | Partial, non-sensitive scores and locked detailed result | Planned; requires privacy-safe server API |
 | Unlock analysis | Sign in / register after analysis and claim anonymous session | Planned; currently login before upload |
 | Login | Email/password, visibility toggle, loading, API error handling | UI coded |
-| Register | Name/email/password, confirmation-email state, signup validation | UI coded |
+| Register | Name, email, password confirmation, email-code entry and resend delay | UI coded; Supabase email template setup required |
 | Forgot password | Recovery email request | Request UI coded; deep-link reset completion pending |
 | Confirm email | Guidance for checking email and returning | UI coded; dedicated deep-link handler pending |
 | Plans preview | Free vs Premium plan comparison without misleading payment CTA | UI coded; server-sourced |
