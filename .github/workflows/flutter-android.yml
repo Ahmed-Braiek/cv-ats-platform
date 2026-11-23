@@ -42,13 +42,18 @@ jobs:
         run: flutter test
       - name: Build debug Android APK
         env:
+          CV_ATS_API_URL: https://cv-ats-api.vercel.app
+          CV_ATS_ANALYSIS_ENABLED: 'true'
           SUPABASE_URL: https://uqtyxhkevnyjvhwdgkyh.supabase.co
           SUPABASE_PUBLISHABLE_KEY: sb_publishable_MlF4aPhLVfhgv5h_Cc2K_Q_20CiDaWw
         run: |
           test -n "$SUPABASE_PUBLISHABLE_KEY"
+          test -n "$CV_ATS_API_URL"
           flutter build apk --debug \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY" \
+            --dart-define=CV_ATS_API_URL="$CV_ATS_API_URL" \
+            --dart-define=CV_ATS_ANALYSIS_ENABLED="$CV_ATS_ANALYSIS_ENABLED"
       - name: Retain test APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
