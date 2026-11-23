@@ -38,7 +38,7 @@ begin
    ) t),'[]'::jsonb)
  ) into result;
  return result;
-end $function$
+end $function$;
 
 drop policy if exists admin_audit_service_only on public.admin_audit_events;
 create policy admin_audit_service_only on public.admin_audit_events
