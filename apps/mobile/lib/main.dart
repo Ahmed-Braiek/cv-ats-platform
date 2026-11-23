@@ -49,6 +49,11 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   String? _uploadedFile;
   String? _uploadMessage;
 
+  @override void initState() {
+    super.initState();
+    _jobDescription.addListener(() { if (mounted) setState(() {}); });
+  }
+
   Future<void> _pickCv() async {
     if (_uploading) return;
     if (!SupabaseConfig.configured) {
@@ -130,7 +135,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           const SizedBox(width:9),
           Expanded(child:Divider(color:onSurface.withValues(alpha:.15))),
           const SizedBox(width:9),
-          const _StepBadge(number:'2',label:'Job details',active:false),
+          _StepBadge(number:'2',label:'Job details',active:_jobDescription.text.trim().length>=20),
         ]),
         const SizedBox(height:24),
         const AtsSectionTitle('Upload your CV',
@@ -167,7 +172,12 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
                 const Text('PDF, DOCX, PNG or JPG · 10 MB maximum',
                   style:TextStyle(fontSize:12,color:AtsPalette.muted)),
                 const SizedBox(height:14),
-                if(_uploading)const LinearProgressIndicator(),
+                if(_uploading)...[
+                  const LinearProgressIndicator(minHeight:5),
+                  const SizedBox(height:10),
+                  const Text('Checking format and storing your CV securely…',
+                    style:TextStyle(fontSize:12,color:AtsPalette.muted)),
+                ],
                 if(!_uploading)Text(_uploadedCvId!=null
                   ?'Change file':'Choose a file from your device',
                   style:const TextStyle(color:AtsPalette.brand,
@@ -205,6 +215,12 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           const Text('We only compare requirements explicitly present in the description.',
             style:TextStyle(color:AtsPalette.muted,fontSize:12)),
         ])),
+        if(_uploading || _submitting)...[
+          const SizedBox(height:15),
+          AtsInfoStrip(icon:_uploading?Icons.file_upload_outlined:Icons.lock_clock_outlined,
+            message:_uploading?'Validating your file and uploading privately.':
+              'Creating the request and contacting the AI processor.'),
+        ],
         if(_uploadMessage!=null)...[
           const SizedBox(height:15),
           AtsPanel(padding:const EdgeInsets.all(14),child:Row(children:[
@@ -215,10 +231,16 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           ])),
         ],
         const SizedBox(height:22),
+        if(_uploadedCvId!=null)const Padding(
+          padding:EdgeInsets.only(bottom:15),
+          child:AtsInfoStrip(icon:Icons.verified_user_outlined,
+            message:'CV uploaded privately. Add the original job posting for '
+              'a complete evidence-based comparison.')),
         FilledButton.icon(
-          onPressed:_uploadedCvId==null || _submitting || !analysisEnabled
+          onPressed:_uploadedCvId==null || _uploading || _submitting ||
+              _jobDescription.text.trim().length<20 || !analysisEnabled
             ?null:_submitAnalysis,
-          icon:Icon(_submitting?Icons.hourglass_top:Icons.auto_awesome),
+          icon:Icon(_submitting?Icons.hourglass_top_rounded:Icons.auto_awesome_rounded),
           label:Text(_submitting?'Submitting securely...':'Analyze my application'),
         ),
         const SizedBox(height:12),
