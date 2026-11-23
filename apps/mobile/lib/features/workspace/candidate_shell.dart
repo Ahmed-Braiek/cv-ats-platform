@@ -312,10 +312,9 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
     ));
     if(confirmed!=true||!mounted)return;
     try{
-      await SupabaseConfig.client.storage.from('cv-private')
-        .remove([file['storage_path'] as String]);
-      await SupabaseConfig.client.rpc('cv_ats_delete_own_cv',
-        params:{'p_cv_id':file['id']});
+      final response=await SupabaseConfig.client.functions.invoke(
+        'delete-cv',body:{'cvId':file['id']});
+      if(response.status!=200)throw StateError('Delete request failed');
       if(!mounted)return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content:Text('CV and linked results deleted.')));
