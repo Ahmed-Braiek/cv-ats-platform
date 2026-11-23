@@ -15,6 +15,26 @@ void main(){
     expect(find.byIcon(Icons.people_outline_rounded),findsWidgets);
   });
 
+  testWidgets('Control Room uses compact navigation on a narrow phone',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(
+      theme: AtsTheme.light(),
+      home: const AdminConsoleScreen(),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+    final nav = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(nav.labelBehavior, NavigationDestinationLabelBehavior.onlyShowSelected);
+    expect(find.text('Control room'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('account inspector shows real fields and protects account actions',
       (tester)async{
     final user=<String,dynamic>{
