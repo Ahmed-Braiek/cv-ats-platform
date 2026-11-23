@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
-void main() {
+import 'config/supabase_config.dart';
+import 'features/auth/auth_screen.dart';
+import 'features/cv/cv_upload_service.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseConfig.initialize();
   runApp(const CvAtsApp());
 }
 
@@ -184,6 +189,37 @@ class NewAnalysisScreen extends StatefulWidget {
 class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   final _jobDescription = TextEditingController();
   final _jobTitle = TextEditingController();
+  bool _uploading = false;
+  String? _uploadedFile;
+  String? _uploadMessage;
+
+  Future<void> _pickCv() async {
+    if (_uploading) return;
+    if (!SupabaseConfig.configured) {
+      setState(() => _uploadMessage = 'Configure Supabase to enable private upload.');
+      return;
+    }
+    if (SupabaseConfig.client.auth.currentUser == null) {
+      final loggedIn = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(builder: (_) => const AuthScreen()),
+      );
+      if (!mounted || loggedIn != true) return;
+    }
+    setState(() { _uploading = true; _uploadMessage = null; });
+    try {
+      final name = await CvUploadService.pickAndUpload();
+      if (!mounted || name == null) return;
+      setState(() {
+        _uploadedFile = name;
+        _uploadMessage = 'CV securely uploaded. AI analysis is not available yet.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _uploadMessage = 'Upload failed: $error');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
 
   @override
   void dispose() {
@@ -205,25 +241,36 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           const Text('Upload your CV and add a job description.',
               style: TextStyle(color: Color(0xFF64748B))),
           const SizedBox(height: 22),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF93C5FD), width: 2),
+          InkWell(
+            onTap: _uploading ? null : _pickCv,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF93C5FD), width: 2),
+              ),
+              child: Column(children: [
+                const Icon(Icons.upload_file_rounded, size: 48, color: CvAtsApp.primary),
+                const SizedBox(height: 12),
+                Text(_uploadedFile ?? 'Choose a CV', style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold,
+                )),
+                const SizedBox(height: 8),
+                const Text('PDF, DOCX, PNG or JPG • up to 10 MB',
+                  style: TextStyle(color: Color(0xFF64748B))),
+                const SizedBox(height: 12),
+                Text(_uploading ? 'Uploading securely...' : 'Tap to select and upload your CV',
+                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+              ]),
             ),
-            child: const Column(children: [
-              Icon(Icons.upload_file_rounded, size: 48, color: CvAtsApp.primary),
-              SizedBox(height: 12),
-              Text('CV upload', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Text('PDF or DOCX • up to 10 MB', style: TextStyle(color: Color(0xFF64748B))),
-              SizedBox(height: 12),
-              Text('File selection will be connected to secure storage next.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
-            ]),
           ),
+          if (_uploadMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(_uploadMessage!, style: const TextStyle(fontSize: 13)),
+          ],
           const SizedBox(height: 22),
           TextField(
             controller: _jobTitle,
@@ -237,7 +284,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
             decoration: const InputDecoration(labelText: 'Job description', alignLabelWithHint: true),
           ),
           const SizedBox(height: 20),
-          const Text('Real analysis is not enabled yet. The backend integration will be added next.',
+          const Text('Your uploaded CV is stored privately. Job matching and Gemini analysis will be connected in the next milestone.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
           const FilledButton(
