@@ -40,19 +40,22 @@ jobs:
       - name: Resolve packages
         run: flutter pub get
       - name: Analyze Flutter source
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Widget tests
         run: flutter test
-      - name: Build Flutter web release
-        run: |
-          flutter build web --release \
-            --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
-            --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
-            --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
-            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+      - name: Check public Flutter build configuration
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+        run: |
+          if [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Set GitHub Actions variable SUPABASE_PUBLISHABLE_KEY (public key from Supabase)."
+            exit 1
+          fi
+          if [ -z "$CV_ATS_API_URL" ]; then
+            echo "::error::Set GitHub Actions variable CV_ATS_API_URL."
+            exit 1
+          fi
       - name: Build installable Android test APK
         run: |
           flutter build apk --debug \
@@ -70,6 +73,16 @@ jobs:
           path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 14
           if-no-files-found: error
+      - name: Build Flutter web release
+        run: |
+          flutter build web --release \
+            --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
+            --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
+            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+        env:
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
       - name: Upload Web release build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
