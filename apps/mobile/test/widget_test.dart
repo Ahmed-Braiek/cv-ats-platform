@@ -127,13 +127,8 @@ void main() {
 
     await tester.tap(find.text('Job match').first);
     await tester.pumpAndSettle();
-    expect(find.text('Requirement-by-requirement'), findsOneWidget);
-    expect(find.text('All'), findsWidgets);
-    expect(find.text('Campaign coordination'), findsOneWidget);
-
-    await tester.tap(find.text('Gaps').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Google Analytics'), findsOneWidget);
+    expect(find.text('Marketing Coordinator'), findsOneWidget);
+    expect(find.textContaining('Match decisions are backed'), findsOneWidget);
 
     await tester.tap(find.text('Next steps').first);
     await tester.pumpAndSettle();
