@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/supabase_config.dart';
 import '../../ui/ats_design.dart';
@@ -291,7 +290,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
                 Text(_text(x['day']).substring(5),style:const TextStyle(
                   fontSize:9,color:AtsPalette.muted)),
               ]),
-            )));
+            ));
           }).toList(),
         ))),
       const SizedBox(height:23),
@@ -353,7 +352,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
             ])),
             const Icon(Icons.chevron_right_rounded,color:AtsPalette.muted),
           ]))),
-      _Pager(total:data['total']),
+      _pager(total:data['total']),
     ]);
   }
 
@@ -402,7 +401,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
               label:const Text('Cancel processing')),
           ],
         ]))),
-      _Pager(total:data['total']),
+      _pager(total:data['total']),
     ]);
   }
 
@@ -479,11 +478,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
         _snack('Visible audit records copied as CSV.');
       },icon:const Icon(Icons.copy_all_outlined),
         label:const Text('Copy visible audit records')),
-      _Pager(total:data['total']),
+      _pager(total:data['total']),
     ]);
   }
 
-  Widget _Pager({required dynamic total}){
+  Widget _pager({required dynamic total}){
     final size=total is num?total.toInt():0;
     if(size<=limit)return const SizedBox.shrink();
     return Padding(padding:const EdgeInsets.only(top:15),child:Row(
