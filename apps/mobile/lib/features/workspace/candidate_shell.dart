@@ -324,7 +324,7 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
                     child:const Text('Close')),
                 ]),
               ))),
-            ),child:Row(children:[
+            child:Row(children:[
               const Icon(Icons.description_outlined,color:AtsPalette.brand),
               const SizedBox(width:14),
               Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
