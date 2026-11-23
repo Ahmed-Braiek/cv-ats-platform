@@ -399,6 +399,34 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
 
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
+
+  Future<void> _editName(BuildContext context,String current) async {
+    final field=TextEditingController(text:current);
+    final result=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Edit profile'),
+      content:TextField(controller:field,maxLength:80,
+        textCapitalization:TextCapitalization.words,
+        decoration:const InputDecoration(labelText:'Display name')),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
+        FilledButton(onPressed:()=>Navigator.pop(ctx,field.text.trim()),
+          child:const Text('Save')),
+      ],
+    ));
+    field.dispose();
+    if(result==null||result.length<2||!context.mounted)return;
+    try{
+      final client=SupabaseConfig.client,user=SupabaseConfig.client.auth.currentUser;
+      if(user==null)return;
+      await client.from('profiles').update({'display_name':result}).eq('id',user.id);
+      await client.auth.updateUser(UserAttributes(data:{'display_name':result}));
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Profile updated.')));
+    }catch(_){
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Profile update failed. Try again.')));
+    }
+  }
   @override Widget build(BuildContext context) {
     final user=SupabaseConfig.client.auth.currentUser;
     if(user==null)return const AtsPage(title:'Account',child:AtsEmptyState(
@@ -421,6 +449,11 @@ class AccountPage extends StatelessWidget {
           Text(user.email??'No email address',
             style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
         ])),
+        IconButton(
+          tooltip:'Edit your display name',
+          icon:const Icon(Icons.edit_outlined),
+          onPressed:()=>_editName(context,
+            (user.userMetadata?['display_name'] as String?)??'')),
       ])),
       const SizedBox(height:26),
       AtsSectionTitle('Subscription'),
@@ -428,11 +461,26 @@ class AccountPage extends StatelessWidget {
       AtsPanel(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const AtsEyebrow('MEMBERSHIP'),
         const SizedBox(height:9),
-        const Text('Explore Free and Premium plans',
-          style:TextStyle(fontSize:17,fontWeight:FontWeight.w800)),
-        const SizedBox(height:8),
-        const Text('See limits, features and current availability.',
-          style:TextStyle(color:AtsPalette.muted)),
+        FutureBuilder<dynamic>(
+          future:SupabaseConfig.client.from('subscriptions').select(
+            'status,subscription_plans(code,name,monthly_analysis_limit,saved_cv_limit)'
+          ).eq('user_id',user.id).eq('status','active').maybeSingle(),
+          builder:(context,s){
+            if(!s.hasData&&!s.hasError)return const AtsSkeleton(width:210,height:26);
+            final row=s.data is Map?Map<String,dynamic>.from(s.data as Map):<String,dynamic>{};
+            final detail=row['subscription_plans'] is Map
+              ?Map<String,dynamic>.from(row['subscription_plans'] as Map)
+              :<String,dynamic>{};
+            return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text("${detail['name']??'Free'} membership",style:const TextStyle(
+                fontSize:18,fontWeight:FontWeight.w800)),
+              const SizedBox(height:7),
+              Text(detail.isEmpty?'Explore plan benefits and limits.':
+                "${detail['monthly_analysis_limit']} analyses / month · ${detail['saved_cv_limit']} saved CVs",
+                style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
+            ]);
+          },
+        ),
         const SizedBox(height:15),
         OutlinedButton.icon(
           icon:const Icon(Icons.workspace_premium_outlined),
