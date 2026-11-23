@@ -511,7 +511,7 @@ class _FieldLabel extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Text(text,
-      style: const TextStyle(fontWeight: FontWeight.w750, fontSize: 13));
+      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13));
 }
 
 class _InlineNotice extends StatelessWidget {
@@ -708,7 +708,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
               Center(child: TextButton(
                 onPressed: _busy || _remaining > 0 ? null : _resend,
                 child: Text(_remaining > 0
-                    ? 'Resend code in \${_remaining}s'
+                    ? 'Resend code in ${_remaining}s'
                     : 'Send a new code'),
               )),
               const SizedBox(height: 12),
