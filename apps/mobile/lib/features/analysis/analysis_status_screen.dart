@@ -113,9 +113,11 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen> {
         if(!['failed','cancelled','expired'].contains(status))
           const LinearProgressIndicator(minHeight:7),
         const SizedBox(height:13),
-        Text(error ?? (['failed','cancelled','expired'].contains(status)
-          ?'The server could not complete this analysis. Please review your file and try later.'
-          :'This screen refreshes automatically while processing.'),
+        Text(error ?? (failed
+          ?_diagnostic(analysis?['failure_code'] as String?)
+          :status=='queued'
+            ?'Queued. If processing has not started, use Start processing below.'
+            :'This screen refreshes automatically while processing.'),
           style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
       ])),
       const SizedBox(height:18),
