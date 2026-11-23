@@ -67,8 +67,9 @@ end $$;
   `20261123213500_admin_account_status.sql`,
   `20261123220000_admin_analytics_versioned.sql`
 - Flutter code: `apps/mobile/lib/features/admin/`
-- CV lifecycle: `supabase/migrations/20261123222500_candidate_profile_cv_lifecycle.sql`
+- CV lifecycle: `supabase/migrations/20261123222500_candidate_profile_cv_lifecycle.sql`, refined by `20261123225500_cv_delete_edge_gateway.sql`; deletion is through the verified `delete-cv` Edge Function, not through a user-executable privileged RPC.
 - No additional secrets are required in Flutter beyond the existing Supabase publishable key.
+- Supabase Security Advisor currently reports **Leaked Password Protection Disabled**; enabling it is a dashboard setting if available on the plan.
 
 Required release tests using **synthetic** accounts:
 
