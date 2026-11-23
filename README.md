@@ -8,13 +8,14 @@ A candidate can upload a CV and compare it to a job description. The system extr
 
 | Area | Current state |
 | --- | --- |
-| Flutter UI | Modern responsive screen code for authentication-first login/create-account tabs, pasteable email OTP, password recovery, candidate dashboard, CV/job form, progress, four results tabs, history, CV library, plans, account, help, appearance, privacy and guarded admin shells |
+| Flutter UI | Modern responsive screen code for authentication-first login/create-account tabs, pasteable email OTP, password recovery, candidate dashboard, CV/job form, five-stage parsing timeline, four results tabs, history, private CV library and deletion, plans, account editing, help, appearance, privacy and full admin console source |
 | Flutter Android build | CI workflow added; successful APK and device testing not yet confirmed |
 | Supabase | Tables, private storage, auth-linked profiles, subscriptions, RLS, queued analyses and result tables |
 | NestJS API | Deployed to Vercel; health/plans HTTP 200; publishable configuration set, authenticated tests pending |
 | Gemini worker | Supabase Edge function `process-cv` ACTIVE (scoring v0.2); the legacy Node worker remains separate and unupgraded |
 | Visitor-before-login analysis | Planned; current upload requires sign-in |
-| Premium payment and admin management | UI only; secure backend workflows pending |
+| Admin management | Admin Edge gateway + service-only SQL roles, statistics, users, plans, analysis monitoring and audited actions deployed; Flutter admin UI committed but release build and role E2E not yet verified |
+| Premium billing | Not integrated. Manual plan entitlements are available to admins but never charge users |
 
 **Do not use real CVs for free-tier Gemini testing without appropriate consent, privacy review and data-processing safeguards.**
 
@@ -28,6 +29,8 @@ A candidate can upload a CV and compare it to a job description. The system extr
 
 ## Key references
 
+- **Full mobile UX design and page inventory:** [Candidate and admin UX pass](docs/product/mobile-experience-and-admin.md)
+- **Administrator setup and security:** [Admin operations](docs/admin/operations.md)
 - **All Flutter pages / workflows:** [Screen and workflow map](docs/product/flutter-screen-and-workflow-map.md)
 - **Flutter developer setup:** [Mobile README](apps/mobile/README.md)
 - **Vercel variables and where to get them:** [Environment variable map](docs/deployment/environment-variable-map.md)
