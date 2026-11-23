@@ -8,11 +8,11 @@ A candidate can upload a CV and compare it to a job description. The system extr
 
 | Area | Current state |
 | --- | --- |
-| Flutter UI | Modern responsive screen code for visitor landing, login, signup, password recovery, candidate dashboard, CV/job form, progress, four results tabs, history, CV library, plans, account, help, appearance, privacy and guarded admin shells |
+| Flutter UI | Modern responsive screen code for authentication-first login/create-account tabs, pasteable email OTP, password recovery, candidate dashboard, CV/job form, progress, four results tabs, history, CV library, plans, account, help, appearance, privacy and guarded admin shells |
 | Flutter Android build | CI workflow added; successful APK and device testing not yet confirmed |
 | Supabase | Tables, private storage, auth-linked profiles, subscriptions, RLS, queued analyses and result tables |
-| NestJS API | Deployed to Vercel, health endpoint returned HTTP 200; authenticated flows still require public key configuration and integration tests |
-| Gemini worker | Source code for extraction, model routing, jobs and rubric exists; **not deployed or end-to-end validated** |
+| NestJS API | Deployed to Vercel; health/plans HTTP 200; publishable configuration set, authenticated tests pending |
+| Gemini worker | Supabase Edge function `process-cv` deployed ACTIVE; real Gemini calls await protected API credentials and validation. Dedicated Node worker code remains |
 | Visitor-before-login analysis | Planned; current upload requires sign-in |
 | Premium payment and admin management | UI only; secure backend workflows pending |
 
