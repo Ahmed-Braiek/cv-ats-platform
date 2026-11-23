@@ -53,6 +53,25 @@ class AtsTheme {
       scaffoldBackgroundColor: background,
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.standard,
+      textTheme: TextTheme(
+        headlineMedium: TextStyle(fontSize: 27, height: 1.17,
+          fontWeight: FontWeight.w900,letterSpacing: -.75,color:colors.onSurface),
+        headlineSmall: TextStyle(fontSize: 22,height:1.22,
+          fontWeight:FontWeight.w900,letterSpacing:-.45,color:colors.onSurface),
+        titleLarge: TextStyle(fontSize:19,fontWeight:FontWeight.w800,
+          letterSpacing:-.25,color:colors.onSurface),
+        titleMedium: TextStyle(fontSize:16,fontWeight:FontWeight.w800,
+          color:colors.onSurface),
+        bodyLarge: TextStyle(fontSize:15,height:1.55,color:colors.onSurface),
+        bodyMedium: TextStyle(fontSize:14,height:1.52,color:colors.onSurface),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+        TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      }),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
         foregroundColor: colors.onSurface,
@@ -313,9 +332,86 @@ class AtsPage extends StatelessWidget {
     body: SafeArea(child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 850),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        padding: EdgeInsets.fromLTRB(
+          MediaQuery.sizeOf(context).width < 480 ? 16 : 22,
+          18,MediaQuery.sizeOf(context).width < 480 ? 16 : 22,35),
         child: child,
       ),
     ))),
   );
+}
+
+
+/// Reusable animated loading placeholders. They display no guessed content:
+/// the actual data is shown only after the backend responds.
+class AtsSkeleton extends StatefulWidget {
+  const AtsSkeleton({super.key, this.height=16, this.width=double.infinity,
+    this.radius=8});
+  final double height,width,radius;
+  @override State<AtsSkeleton> createState()=>_AtsSkeletonState();
+}
+class _AtsSkeletonState extends State<AtsSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController animation=AnimationController(
+    vsync:this,duration:const Duration(milliseconds:1100),
+  )..repeat(reverse:true);
+  @override void dispose(){animation.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>AnimatedBuilder(
+    animation:animation,builder:(context,_) {
+      final base=Theme.of(context).colorScheme.onSurface;
+      return Container(
+        width:widget.width,height:widget.height,
+        decoration:BoxDecoration(
+          borderRadius:BorderRadius.circular(widget.radius),
+          color:base.withValues(alpha:.055+animation.value*.075)),
+      );
+    });
+}
+class AtsLoadingCards extends StatelessWidget {
+  const AtsLoadingCards({super.key,this.count=3,this.heading=true});
+  final int count;final bool heading;
+  @override Widget build(BuildContext context)=>Column(
+    crossAxisAlignment:CrossAxisAlignment.start,
+    children:[
+      if(heading)...[
+        const AtsSkeleton(width:150,height:12),
+        const SizedBox(height:11),
+        const AtsSkeleton(width:230,height:27),
+        const SizedBox(height:23),
+      ],
+      for(var i=0;i<count;i++)Padding(
+        padding:const EdgeInsets.only(bottom:12),
+        child:AtsPanel(child:Row(children:[
+          const AtsSkeleton(width:48,height:48,radius:14),
+          const SizedBox(width:14),
+          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const AtsSkeleton(height:15),
+            const SizedBox(height:10),
+            const AtsSkeleton(width:148,height:11),
+          ])),
+        ])),
+      ),
+    ]);
+}
+class AtsInfoStrip extends StatelessWidget{
+  const AtsInfoStrip({super.key,required this.message,
+    this.icon=Icons.info_outline_rounded,this.warning=false});
+  final String message;final IconData icon;final bool warning;
+  @override Widget build(BuildContext context){
+    final color=warning?AtsPalette.warn:AtsPalette.brand;
+    return Container(
+      padding:const EdgeInsets.symmetric(horizontal:15,vertical:14),
+      decoration:BoxDecoration(
+        color:color.withValues(alpha:.085),
+        borderRadius:BorderRadius.circular(14)),
+      child:Row(children:[
+        Icon(icon,color:color,size:20),
+        const SizedBox(width:11),
+        Expanded(child:Text(message,style:TextStyle(
+          height:1.5,fontSize:12,
+          color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.82)))),
+      ]),
+    );
+  }
 }
