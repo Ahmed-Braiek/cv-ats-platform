@@ -33,7 +33,7 @@ void main(){
     expect(find.text('Test Candidate'),findsOneWidget);
     expect(find.text('candidate@example.test'),findsOneWidget);
     expect(find.text('ACCOUNT INSPECTOR'),findsOneWidget);
-    expect(find.text('Free'),findsWidgets);
+    expect(find.text('FREE'),findsWidgets);
   });
 
   testWidgets('shared loading placeholders render without mock statistics',
