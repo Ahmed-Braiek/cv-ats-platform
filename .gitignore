@@ -1,0 +1,47 @@
+# local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.jks
+key.properties
+android/local.properties
+google-services.json
+GoogleService-Info.plist
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+coverage/
+*.iml
+.idea/
+.vscode/
+**/ios/Pods/
+**/ios/.symlinks/
+
+# Node
+node_modules/
+dist/
+.next/
+.turbo/
+.nest/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# Supabase
+supabase/.branches/
+supabase/.profiles/
+supabase/.temp/
+
+# local private material
+private/
+tmp/
+uploads/
+*.sqlite
+.DS_Store
