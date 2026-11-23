@@ -4,6 +4,8 @@ import 'config/supabase_config.dart';
 import 'features/analysis/analysis_api.dart';
 import 'features/analysis/analysis_status_screen.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/workspace/candidate_shell.dart';
+import 'ui/ats_design.dart';
 import 'features/cv/cv_upload_service.dart';
 
 Future<void> main() async {
@@ -14,44 +16,18 @@ Future<void> main() async {
 
 class CvAtsApp extends StatelessWidget {
   const CvAtsApp({super.key});
-
-  static const Color ink = Color(0xFF0F172A);
-  static const Color primary = Color(0xFF2563EB);
-  static const Color cyan = Color(0xFF06B6D4);
-  static const Color background = Color(0xFFF8FAFC);
-
   @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: primary,
-      surface: Colors.white,
-      brightness: Brightness.light,
-    );
-    return MaterialApp(
-      title: 'CV ATS Analysis',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: scheme,
-        scaffoldBackgroundColor: background,
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: background,
-          foregroundColor: ink,
-          centerTitle: false,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.all(16),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: primary,
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AtsAppearance.mode,
+      builder:(context, mode, _) => MaterialApp(
+        title:'CV ATS • Career insights',
+        debugShowCheckedModeBanner:false,
+        theme:AtsTheme.light(),
+        darkTheme:AtsTheme.dark(),
+        themeMode:mode,
+        home:const LandingScreen(),
       ),
-      home: const LandingScreen(),
     );
   }
 }
@@ -87,98 +63,177 @@ class PageShell extends StatelessWidget {
   }
 }
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
+  @override
+  State<LandingScreen> createState()=>_LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
+  Future<void> _openAuth() async {
+    if(!SupabaseConfig.configured){
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Configure the public Supabase key to sign in.')));
+      return;
+    }
+    final ok=await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder:(_)=>const AuthScreen()));
+    if(!mounted)return;
+    if(ok == true) _openWorkspace();
+  }
+
+  void _openWorkspace() => Navigator.of(context).push(
+    MaterialPageRoute<void>(builder:(_)=>const CandidateShell()));
 
   @override
   Widget build(BuildContext context) {
-    return PageShell(
-      title: 'CV ATS',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 42),
-          const Chip(label: Text('CV insights • Academic prototype')),
-          const SizedBox(height: 24),
-          Text(
-            'Know how your CV performs before you apply.',
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              color: CvAtsApp.ink,
-              fontWeight: FontWeight.w800,
+    final signedIn=SupabaseConfig.configured &&
+      SupabaseConfig.client.auth.currentUser!=null;
+    final dark=Theme.of(context).brightness==Brightness.dark;
+    final text=Theme.of(context).colorScheme.onSurface;
+    return Scaffold(
+      appBar:AppBar(title:Row(mainAxisSize:MainAxisSize.min,children:[
+        Container(
+          padding:const EdgeInsets.all(7),
+          decoration:BoxDecoration(color:AtsPalette.brand,
+            borderRadius:BorderRadius.circular(9)),
+          child:const Icon(Icons.layers_rounded,size:18,color:Colors.white)),
+        const SizedBox(width:8),
+        const Text('CV ATS'),
+      ]),actions:[
+        TextButton(
+          onPressed:signedIn?_openWorkspace:_openAuth,
+          child:Text(signedIn?'My workspace':'Sign in')),
+        const SizedBox(width:8),
+      ]),
+      body:SafeArea(child:Align(alignment:Alignment.topCenter,
+        child:ConstrainedBox(
+          constraints:const BoxConstraints(maxWidth:920),
+          child:ListView(padding:const EdgeInsets.fromLTRB(20,25,20,36),children:[
+            Row(children:[
+              Container(padding:const EdgeInsets.symmetric(horizontal:11,vertical:7),
+                decoration:BoxDecoration(
+                  color:AtsPalette.ocean.withValues(alpha:.12),
+                  borderRadius:BorderRadius.circular(40)),
+                child:const Row(mainAxisSize:MainAxisSize.min,children:[
+                  Icon(Icons.bolt_rounded,size:15,color:AtsPalette.success),
+                  SizedBox(width:5),
+                  Text('MAKE YOUR NEXT APPLICATION STRONGER',
+                    style:TextStyle(fontSize:10,fontWeight:FontWeight.w900,
+                      color:AtsPalette.success,letterSpacing:.45)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height:24),
+            Text('Know how your CV\nperforms before\nyou apply.',
+              style:Theme.of(context).textTheme.displaySmall?.copyWith(
+                height:1.13,fontWeight:FontWeight.w900,
+                letterSpacing:-1.5,color:text)),
+            const SizedBox(height:16),
+            Text('See what automated systems can read, how well your CV covers a job description, and what you can improve — without inventing experience.',
+              style:TextStyle(height:1.55,fontSize:16,
+                color:text.withValues(alpha:.66))),
+            const SizedBox(height:24),
+            FilledButton.icon(
+              onPressed:()=>Navigator.of(context).push(
+                MaterialPageRoute<void>(builder:(_)=>const NewAnalysisScreen())),
+              icon:const Icon(Icons.upload_file_rounded),
+              label:const Text('Analyze my CV'),
             ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'Understand ATS compatibility, compare your CV with a job description, and discover truthful improvements.',
-            style: TextStyle(fontSize: 17, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 30),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const NewAnalysisScreen()),
+            const SizedBox(height:10),
+            OutlinedButton.icon(
+              onPressed:signedIn?_openWorkspace:_openAuth,
+              icon:Icon(signedIn?Icons.grid_view_rounded:Icons.login_rounded),
+              label:Text(signedIn?'Open workspace':'Sign in / create account')),
+            const SizedBox(height:24),
+            Container(
+              padding:const EdgeInsets.all(20),
+              decoration:BoxDecoration(
+                gradient:const LinearGradient(
+                  colors:[AtsPalette.midnight,Color(0xFF284D91)],
+                  begin:Alignment.topLeft,end:Alignment.bottomRight),
+                borderRadius:BorderRadius.circular(23)),
+              child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                const AtsEyebrow('YOUR PERSONAL INSIGHT SPACE',
+                  color:Color(0xFF82E6F1)),
+                const SizedBox(height:16),
+                const Text('Two scores. Two different questions.',
+                  style:TextStyle(color:Colors.white,
+                    fontSize:21,fontWeight:FontWeight.w900)),
+                const SizedBox(height:16),
+                for(final entry in <(String,String,double)>[
+                  ('ATS compatibility','Can software understand your CV?',.7),
+                  ('Job Match','Does your CV show the skills requested?',.55),
+                ]) Padding(padding:const EdgeInsets.only(bottom:15),
+                  child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                    Text(entry.$1,style:const TextStyle(
+                      fontWeight:FontWeight.w700,color:Colors.white)),
+                    const SizedBox(height:5),
+                    Text(entry.$2,style:const TextStyle(
+                      color:Color(0xFFC5D7F2),fontSize:12)),
+                    const SizedBox(height:9),
+                    ClipRRect(borderRadius:BorderRadius.circular(10),
+                      child:LinearProgressIndicator(
+                        value:entry.$3,minHeight:7,
+                        backgroundColor:Colors.white12,
+                        valueColor:AlwaysStoppedAnimation<Color>(
+                          entry.$1=='Job Match'?AtsPalette.ocean:
+                            const Color(0xFF88A5FF)))),
+                  ])),
+                const Text('Illustration only — no personal results shown.',
+                  style:TextStyle(color:Color(0xFFAEC4DF),fontSize:11)),
+              ]),
             ),
-            icon: const Icon(Icons.upload_file),
-            label: const Text('Analyze my CV'),
-          ),
-          const SizedBox(height: 28),
-          const FeatureCard(
-            icon: Icons.description_outlined,
-            title: 'ATS compatibility',
-            subtitle: 'Structure, readability, formatting and keyword coverage.',
-          ),
-          const FeatureCard(
-            icon: Icons.track_changes_outlined,
-            title: 'Job Match',
-            subtitle: 'Skills, education, experience and role-specific requirements.',
-          ),
-          const FeatureCard(
-            icon: Icons.auto_awesome_outlined,
-            title: 'Actionable improvements',
-            subtitle: 'Evidence-based suggestions. Never invent experience.',
-          ),
-        ],
-      ),
+            const SizedBox(height:28),
+            const AtsSectionTitle('What you will discover',
+              subtitle:'Clear feedback, organized into focused sections'),
+            const SizedBox(height:14),
+            const FeatureCard(icon:Icons.verified_outlined,
+              title:'ATS compatibility',
+              subtitle:'Sections, parsing readiness and clear document structure.'),
+            const SizedBox(height:10),
+            const FeatureCard(icon:Icons.track_changes_rounded,
+              title:'Job Match',
+              subtitle:'Visible skill coverage versus the job requirements.'),
+            const SizedBox(height:10),
+            const FeatureCard(icon:Icons.lightbulb_outline,
+              title:'Actionable recommendations',
+              subtitle:'Specific, honest improvements based on your CV evidence.'),
+            const SizedBox(height:18),
+            Center(child:Text(
+              'Built for thoughtful career preparation. Not a hiring prediction.',
+              textAlign:TextAlign.center,style:TextStyle(
+                color:dark?Colors.white54:AtsPalette.muted,fontSize:12))),
+          ]),
+        ))),
     );
   }
 }
 
 class FeatureCard extends StatelessWidget {
-  const FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    super.key,
-  });
+  const FeatureCard({super.key,required this.icon,required this.title,
+    required this.subtitle});
   final IconData icon;
-  final String title;
-  final String subtitle;
-
+  final String title,subtitle;
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: CvAtsApp.primary, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                  const SizedBox(height: 6),
-                  Text(subtitle, style: const TextStyle(color: Color(0xFF64748B))),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context)=>AtsPanel(
+    child:Row(children:[
+      Container(padding:const EdgeInsets.all(14),
+        decoration:BoxDecoration(
+          color:AtsPalette.brand.withValues(alpha:.09),
+          borderRadius:BorderRadius.circular(15)),
+        child:Icon(icon,color:AtsPalette.brand,size:25)),
+      const SizedBox(width:16),
+      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(title,style:const TextStyle(
+          fontSize:16,fontWeight:FontWeight.w800)),
+        const SizedBox(height:6),
+        Text(subtitle,style:const TextStyle(
+          height:1.45,color:AtsPalette.muted,fontSize:13)),
+      ])),
+      const Icon(Icons.chevron_right_rounded,color:AtsPalette.muted),
+    ]),
+  );
 }
 
 class NewAnalysisScreen extends StatefulWidget {
