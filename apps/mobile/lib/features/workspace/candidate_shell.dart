@@ -155,8 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
       const SizedBox(height:14),
       FutureBuilder<List<Map<String,dynamic>>>(future:_analyses,builder:(context,snapshot){
         if(snapshot.connectionState != ConnectionState.done)
-          return const Center(child:Padding(
-            padding:EdgeInsets.all(25),child:CircularProgressIndicator()));
+          return const AtsLoadingCards(count:3,heading:false);
         if(snapshot.hasError)
           return AtsEmptyState(icon:Icons.wifi_off_rounded,
             title:'Cannot load your activity',
@@ -254,8 +253,7 @@ class _AnalysisHistoryPageState extends State<AnalysisHistoryPage> {
       ]),
       const SizedBox(height:18),
       FutureBuilder<List<Map<String,dynamic>>>(future:_history,builder:(context,s){
-        if(!s.hasData && !s.hasError)return const Center(
-          child:Padding(padding:EdgeInsets.all(28),child:CircularProgressIndicator()));
+        if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:3,heading:false);
         if(s.hasError)return const AtsEmptyState(icon:Icons.error_outline,
           title:'History unavailable',description:'Please retry when you are online.');
         final rows=(s.data ?? []).where((r){
@@ -292,8 +290,7 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
       const AtsHeader(title:'Your CV library',
         subtitle:'Your documents are stored in a private, access-controlled bucket.'),
       FutureBuilder<List<Map<String,dynamic>>>(future:_documents,builder:(context,s){
-        if(!s.hasData && !s.hasError)return const Center(
-          child:Padding(padding:EdgeInsets.all(28),child:CircularProgressIndicator()));
+        if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:3,heading:false);
         if(s.hasError)return const AtsEmptyState(icon:Icons.lock_outline,
           title:'Unable to load documents',
           description:'Check your authentication and internet connection.');
@@ -445,7 +442,7 @@ class SubscriptionPlansPage extends StatelessWidget {
           'code,name,monthly_analysis_limit,saved_cv_limit,history_days,pdf_export_enabled'
         ).eq('active',true).order('monthly_analysis_limit'),
         builder:(context,s){
-          if(!s.hasData && !s.hasError)return const CircularProgressIndicator();
+          if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:2,heading:false);
           if(s.hasError)return const AtsEmptyState(icon:Icons.cloud_off,
             title:'Plans unavailable',description:'Try again when the network is available.');
           final rows=(s.data as List? ?? []);
