@@ -16,6 +16,7 @@ fi
 
 "$FLUTTER_BIN" --version
 "$FLUTTER_BIN" config --enable-web
+"$FLUTTER_BIN" create --platforms=web --project-name cv_ats_mobile .
 "$FLUTTER_BIN" pub get
 
 # Only PUBLIC environment values are compiled into the browser build.
