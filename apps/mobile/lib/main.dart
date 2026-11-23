@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'config/supabase_config.dart';
+import 'features/analysis/analysis_api.dart';
+import 'features/analysis/analysis_status_screen.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/cv/cv_upload_service.dart';
 
@@ -190,6 +192,8 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   final _jobDescription = TextEditingController();
   final _jobTitle = TextEditingController();
   bool _uploading = false;
+  bool _submitting = false;
+  String? _uploadedCvId;
   String? _uploadedFile;
   String? _uploadMessage;
 
@@ -207,10 +211,11 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
     }
     setState(() { _uploading = true; _uploadMessage = null; });
     try {
-      final name = await CvUploadService.pickAndUpload();
-      if (!mounted || name == null) return;
+      final uploaded = await CvUploadService.pickAndUpload();
+      if (!mounted || uploaded == null) return;
       setState(() {
-        _uploadedFile = name;
+        _uploadedCvId = uploaded.id;
+        _uploadedFile = uploaded.name;
         _uploadMessage = 'CV securely uploaded. AI analysis is not available yet.';
       });
     } catch (error) {
@@ -220,6 +225,31 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
     }
   }
 
+
+  Future<void> _submitAnalysis() async {
+    if (_uploadedCvId == null || _submitting) return;
+    if (_jobDescription.text.trim().length < 20) {
+      setState(() => _uploadMessage = 'Enter at least 20 characters for the job description.');
+      return;
+    }
+    setState(() { _submitting = true; _uploadMessage = null; });
+    try {
+      final id = await AnalysisApi.submit(
+        cvId: _uploadedCvId!,
+        jobDescription: _jobDescription.text.trim(),
+        jobTitle: _jobTitle.text.trim(),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => AnalysisStatusScreen(analysisId: id),
+      ));
+    } catch (_) {
+      if (mounted) setState(() => _uploadMessage =
+        'Unable to start the analysis. Check your connection, plan quota and API configuration.');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -284,12 +314,12 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
             decoration: const InputDecoration(labelText: 'Job description', alignLabelWithHint: true),
           ),
           const SizedBox(height: 20),
-          const Text('Your uploaded CV is stored privately. Job matching and Gemini analysis will be connected in the next milestone.',
+          const Text('Upload a CV, enter a real job description, then submit it for processing by the backend. Processing requires the deployed API and Gemini worker.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
-          const FilledButton(
-            onPressed: null,
-            child: Text('Analyze my application'),
+          FilledButton(
+            onPressed: (_uploadedCvId == null || _submitting) ? null : _submitAnalysis,
+            child: Text(_submitting ? 'Submitting...' : 'Analyze my application'),
           ),
         ],
       ),
