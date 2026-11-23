@@ -11,7 +11,7 @@ void main(){
     await tester.pumpAndSettle();
     expect(find.text('Control room'),findsOneWidget);
     expect(find.text('Administration unavailable'),findsOneWidget);
-    expect(find.text('Try again'),findsOneWidget);
+    expect(find.text('Retry admin section'),findsOneWidget);
     expect(find.byIcon(Icons.people_outline_rounded),findsWidgets);
   });
 
