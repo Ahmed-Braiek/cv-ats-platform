@@ -15,6 +15,10 @@ abstract final class AtsPalette {
   static const midnight = Color(0xFF0E1832);
 }
 
+class AtsAppearance {
+  static final ValueNotifier<ThemeMode> mode = ValueNotifier(ThemeMode.system);
+}
+
 class AtsTheme {
   static ThemeData light() {
     const scheme = ColorScheme.light(
