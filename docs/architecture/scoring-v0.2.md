@@ -1,7 +1,7 @@
 # Scoring v0.2 — evidence first, transferable fit, explainable mobile report
 
 **Implementation:** `supabase/functions/process-cv/scoring.ts` and `index.ts`.
-**Live Edge Function:** `process-cv` v6 (as deployed during the scoring upgrade).
+**Live Edge Function:** `process-cv` v7 (scoring upgrade plus storage minimization).
 **Version:** `ats-match-v0.2`.
 
 The old 100% ATS / 0% Job Match on a well-extracted CV showed a real evaluation bug, not missing OCR: the database had 43 skill strings and 3 experience entries, but the evaluator compared exact strings and awarded section-presence points. The old rows remain marked `ats-match-v0.1` and should not be silently re-scored.
