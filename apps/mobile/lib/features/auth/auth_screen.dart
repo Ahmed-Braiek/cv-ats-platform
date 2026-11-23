@@ -593,7 +593,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
         setState(() => _success =
             'Email verified. Return to Sign in to access your workspace.');
       }
-    } on AuthException catch (e) {
+    } on AuthException catch (_) {
       if (mounted) setState(() => _error =
           'The code is invalid or has expired. Please check your email and try again.');
     } catch (_) {
@@ -620,7 +620,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
         _remaining = 60;
         _success = 'A fresh code has been requested. Check your inbox.';
       });
-    } on AuthException catch (e) {
+    } on AuthException catch (_) {
       if (mounted) setState(() => _error =
           'We couldn’t resend the code yet. Wait a moment and try again.');
     } catch (_) {
