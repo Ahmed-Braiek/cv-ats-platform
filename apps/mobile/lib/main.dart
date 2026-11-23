@@ -45,6 +45,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   static const analysisEnabled = bool.fromEnvironment('CV_ATS_ANALYSIS_ENABLED', defaultValue:false);
   bool _uploading = false;
   bool _submitting = false;
+  bool _uploadFailed = false;
   String? _uploadedCvId;
   String? _uploadedFile;
   String? _uploadMessage;
@@ -66,17 +67,19 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
       );
       if (!mounted || loggedIn != true) return;
     }
-    setState(() { _uploading = true; _uploadMessage = null; });
+    setState(() { _uploading = true; _uploadFailed = false; _uploadMessage = null; });
     try {
       final uploaded = await CvUploadService.pickAndUpload();
       if (!mounted || uploaded == null) return;
       setState(() {
         _uploadedCvId = uploaded.id;
         _uploadedFile = uploaded.name;
+        _uploadFailed = false;
         _uploadMessage = 'CV uploaded privately. Add a job description to continue.';
       });
-    } catch (error) {
-      if (mounted) setState(() => _uploadMessage = 'Upload failed: $error');
+    } catch (_) {
+      if (mounted) setState(() { _uploadFailed = true;
+        _uploadMessage = 'We could not upload this CV. Check the file and your connection, then retry.'; });
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -89,7 +92,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
       setState(() => _uploadMessage = 'Enter at least 20 characters for the job description.');
       return;
     }
-    setState(() { _submitting = true; _uploadMessage = null; });
+    setState(() { _submitting = true; _uploadFailed = false; _uploadMessage = null; });
     try {
       final id = await AnalysisApi.submit(
         cvId: _uploadedCvId!,
@@ -146,7 +149,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           clipBehavior:Clip.antiAlias,
           borderRadius:BorderRadius.circular(20),
           child:InkWell(
-            onTap:_uploading?null:_pickCv,
+            onTap:_uploading||_submitting?null:_pickCv,
             child:Container(
               width:double.infinity,
               padding:const EdgeInsets.fromLTRB(20,28,20,28),
@@ -164,22 +167,25 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
                     color:_uploadedCvId!=null?AtsPalette.success:AtsPalette.brand,
                     size:32)),
                 const SizedBox(height:13),
-                Text(_uploadedFile??'Tap to choose your CV',
+                Text(_uploadedFile??'Choose your CV to get started',
                   maxLines:2,overflow:TextOverflow.ellipsis,
                   textAlign:TextAlign.center,
                   style:const TextStyle(fontWeight:FontWeight.w800,fontSize:17)),
                 const SizedBox(height:8),
-                const Text('PDF, DOCX, PNG or JPG · 10 MB maximum',
-                  style:TextStyle(fontSize:12,color:AtsPalette.muted)),
+                Text('PDF, DOCX, PNG or JPG · 10 MB maximum',
+                  style:TextStyle(fontSize:12,
+                    color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.68))),
                 const SizedBox(height:14),
                 if(_uploading)...[
                   const LinearProgressIndicator(minHeight:5),
                   const SizedBox(height:10),
-                  const Text('Checking format and storing your CV securely…',
-                    style:TextStyle(fontSize:12,color:AtsPalette.muted)),
+                  Text('Checking format and storing your CV securely…',
+                    textAlign:TextAlign.center,
+                    style:TextStyle(fontSize:12,
+                      color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.72))),
                 ],
                 if(!_uploading)Text(_uploadedCvId!=null
-                  ?'Change file':'Choose a file from your device',
+                  ?'Replace uploaded CV':_uploadFailed?'Retry CV upload':'Browse files',
                   style:const TextStyle(color:AtsPalette.brand,
                     fontWeight:FontWeight.w700)),
               ]),
@@ -223,12 +229,8 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
         ],
         if(_uploadMessage!=null)...[
           const SizedBox(height:15),
-          AtsPanel(padding:const EdgeInsets.all(14),child:Row(children:[
-            const Icon(Icons.info_outline,color:AtsPalette.brand,size:19),
-            const SizedBox(width:9),
-            Expanded(child:Text(_uploadMessage!,
-              style:const TextStyle(fontSize:12,height:1.4))),
-          ])),
+          AtsInfoStrip(icon:_uploadFailed?Icons.error_outline_rounded:
+            Icons.info_outline_rounded,message:_uploadMessage!,warning:_uploadFailed),
         ],
         const SizedBox(height:22),
         if(_uploadedCvId!=null)const Padding(
@@ -236,13 +238,13 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           child:AtsInfoStrip(icon:Icons.verified_user_outlined,
             message:'CV uploaded privately. Add the original job posting for '
               'a complete evidence-based comparison.')),
-        FilledButton.icon(
+        SizedBox(width:double.infinity,child:FilledButton.icon(
           onPressed:_uploadedCvId==null || _uploading || _submitting ||
               _jobDescription.text.trim().length<20 || !analysisEnabled
             ?null:_submitAnalysis,
           icon:Icon(_submitting?Icons.hourglass_top_rounded:Icons.auto_awesome_rounded),
           label:Text(_submitting?'Submitting securely...':'Analyze my application'),
-        ),
+        )),
         const SizedBox(height:12),
         Text(analysisEnabled
           ?'Your request enters a secure queue. Results appear when processing finishes.'
