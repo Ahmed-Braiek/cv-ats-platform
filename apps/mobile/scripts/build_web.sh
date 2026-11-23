@@ -18,6 +18,8 @@ fi
 "$FLUTTER_BIN" config --enable-web
 "$FLUTTER_BIN" create --platforms=web --project-name cv_ats_mobile .
 "$FLUTTER_BIN" pub get
+"$FLUTTER_BIN" analyze --no-fatal-infos --no-fatal-warnings
+"$FLUTTER_BIN" test
 
 # Only PUBLIC environment values are compiled into the browser build.
 "$FLUTTER_BIN" build web --release   --dart-define="SUPABASE_URL=${SUPABASE_URL:-https://uqtyxhkevnyjvhwdgkyh.supabase.co}"   --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY:-}"   --dart-define="CV_ATS_API_URL=${CV_ATS_API_URL:-}"   --dart-define="CV_ATS_ANALYSIS_ENABLED=${CV_ATS_ANALYSIS_ENABLED:-false}"
