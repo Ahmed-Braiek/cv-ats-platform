@@ -212,10 +212,13 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
             }),
           ))),
         ])),
-        bottomNavigationBar:desktop?null:NavigationBar(
-          selectedIndex:selected,onDestinationSelected:_navigate,
-          labelBehavior:NavigationDestinationLabelBehavior.alwaysShow,
-          destinations:nav,
+        bottomNavigationBar:desktop?null:SafeArea(
+          top:false,
+          child:NavigationBar(
+            selectedIndex:selected,onDestinationSelected:_navigate,
+            labelBehavior:NavigationDestinationLabelBehavior.onlyShowSelected,
+            destinations:nav,
+          ),
         ),
       );
     });
