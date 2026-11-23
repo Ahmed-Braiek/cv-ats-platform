@@ -35,6 +35,7 @@ A candidate can upload a CV and compare it to a job description. The system extr
 - **Database design:** [Data model](docs/architecture/database-plan.md)
 - **AI pipeline and safety:** [Gemini milestone](docs/architecture/gemini-analysis-milestone.md)
 - **Deployment:** [Vercel API guide](docs/deployment/vercel-api.md)
+- **Web + APK + Worker release:** [Release runbook](docs/deployment/web-android-worker-runbook.md)
 
 ## Development checks
 
