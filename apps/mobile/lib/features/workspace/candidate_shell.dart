@@ -32,6 +32,7 @@ class _CandidateShellState extends State<CandidateShell> {
       const AccountPage(),
     ];
     const labels = ['Overview', 'Analyze', 'History', 'My CVs', 'Account'];
+    const compactLabels = ['Home', 'Analyze', 'History', 'CVs', 'Account'];
     const icons = [
       Icons.space_dashboard_outlined, Icons.auto_awesome_outlined,
       Icons.history_outlined, Icons.description_outlined,
@@ -62,15 +63,19 @@ class _CandidateShellState extends State<CandidateShell> {
           ),
           Expanded(child: IndexedStack(index: _tab, children: pages)),
         ]),
-        bottomNavigationBar: wide ? null : NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: (value) => setState(() => _tab = value),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: List.generate(labels.length, (i) =>
-            NavigationDestination(
-              icon: Icon(icons[i]), selectedIcon: Icon(selected[i]),
-              label: labels[i],
-            )),
+        bottomNavigationBar: wide ? null : SafeArea(
+          top: false,
+          child: NavigationBar(
+            selectedIndex: _tab,
+            onDestinationSelected: (value) => setState(() => _tab = value),
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+            destinations: List.generate(compactLabels.length, (i) =>
+              NavigationDestination(
+                tooltip: labels[i],
+                icon: Icon(icons[i]), selectedIcon: Icon(selected[i]),
+                label: compactLabels[i],
+              )),
+          ),
         ),
       );
     });
@@ -122,8 +127,9 @@ class _DashboardPageState extends State<DashboardPage> {
       Text('Welcome back, $name',style:Theme.of(context).textTheme.headlineMedium
         ?.copyWith(fontWeight:FontWeight.w900)),
       const SizedBox(height:8),
-      const Text('Your progress, clearer with every application.',
-        style:TextStyle(color:AtsPalette.muted)),
+      Text('Your progress, clearer with every application.',
+        style:TextStyle(color:Theme.of(context).colorScheme.onSurface
+          .withValues(alpha:.68))),
       const SizedBox(height:23),
       Container(
         width:double.infinity,
