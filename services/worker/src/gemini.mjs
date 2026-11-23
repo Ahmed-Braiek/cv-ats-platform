@@ -9,8 +9,8 @@ const DEFAULT_TIMEOUT_MS = 65_000;
 
 function configurations(kind) {
   const ids = (kind === 'extract'
-    ? [process.env.GEMINI_MODEL_OCR, process.env.GEMINI_MODEL_FALLBACK]
-    : [process.env.GEMINI_MODEL_ANALYSIS, process.env.GEMINI_MODEL_FALLBACK]).filter(Boolean);
+    ? [process.env.GEMINI_MODEL_OCR, process.env.GEMINI_MODEL_FALLBACK, process.env.GEMINI_MODEL_TERTIARY]
+    : [process.env.GEMINI_MODEL_ANALYSIS, process.env.GEMINI_MODEL_FALLBACK, process.env.GEMINI_MODEL_TERTIARY]).filter(Boolean);
   const keys = [
     process.env.GEMINI_API_KEY_PRIMARY,
     process.env.GEMINI_API_KEY_SECONDARY,
