@@ -1,4 +1,5 @@
 import 'package:cv_ats_mobile/main.dart';
+import 'package:cv_ats_mobile/features/analysis/analysis_report_screen.dart';
 import 'package:cv_ats_mobile/features/auth/auth_screen.dart';
 import 'package:cv_ats_mobile/ui/ats_design.dart';
 import 'package:flutter/material.dart';
@@ -69,6 +70,74 @@ void main() {
       (widget) => widget is FilledButton && widget.onPressed == null,
     );
     expect(disabled, findsWidgets);
+  });
+
+  testWidgets('evidence report explains scores and provides requirement filters',
+      (tester) async {
+    final report = <String, dynamic>{
+      'ats': {
+        'overall': 83,
+        'rubric_json': {
+          'version': 'ats-match-v0.2',
+          'checks': [
+            {'title': 'Readable content', 'score': 14,
+             'max': 20, 'note': 'Text extraction verified'},
+          ],
+        },
+      },
+      'match': {
+        'overall': 36,
+        'rubric_json': {
+          'version': 'ats-match-v0.2',
+          'job_title': 'Marketing Coordinator',
+          'summary': {'total': 3, 'direct': 1,
+            'transferable': 1, 'missing': 1, 'confidence': 'moderate'},
+          'required_coverage': .40,
+          'preferred_coverage': 0,
+          'category_scores': {'soft_skill': 100, 'tool': 0},
+          'requirements': [
+            {'id': 'R1', 'text': 'Communication',
+              'importance': 'required', 'status': 'direct',
+              'evidence_quote': 'Strong client communication',
+              'source_quote': 'Strong written and verbal communication skills.',
+              'explanation': 'Supported by client work'},
+            {'id': 'R2', 'text': 'Campaign coordination',
+              'importance': 'required', 'status': 'transferable',
+              'evidence_quote': 'Managed projects from idea to delivery',
+              'source_quote': 'Coordinate promotional events and campaigns.',
+              'explanation': 'Some adjacent project experience'},
+            {'id': 'R3', 'text': 'Google Analytics',
+              'importance': 'required', 'status': 'missing',
+              'evidence_quote': '',
+              'source_quote': 'Familiarity with Google Analytics.',
+              'explanation': 'Not demonstrated'},
+          ],
+        },
+      },
+      'recommendations': [
+        {'priority': 1, 'category': 'job_gap',
+          'message': 'Only add Google Analytics if you have used it.'},
+      ],
+    };
+    await tester.pumpWidget(MaterialApp(
+      home: AnalysisReportScreen(payload: report)));
+    expect(find.text('Marketing Coordinator'), findsWidgets);
+    expect(find.text('36'), findsWidgets);
+    expect(find.text('83/100'), findsOneWidget);
+
+    await tester.tap(find.text('Job match').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Requirement-by-requirement'), findsOneWidget);
+    expect(find.text('All'), findsWidgets);
+    expect(find.text('Campaign coordination'), findsOneWidget);
+
+    await tester.tap(find.text('Gaps').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Google Analytics'), findsOneWidget);
+
+    await tester.tap(find.text('Next steps').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Only add Google Analytics'), findsOneWidget);
   });
 
   testWidgets('appearance controller switches to dark mode',
