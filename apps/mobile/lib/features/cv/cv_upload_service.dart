@@ -6,6 +6,12 @@ import 'package:uuid/uuid.dart';
 
 import '../../config/supabase_config.dart';
 
+class UploadedCv {
+  const UploadedCv({required this.id, required this.name});
+  final String id;
+  final String name;
+}
+
 class CvUploadService {
   static const maxBytes = 10 * 1024 * 1024;
   static const _uuid = Uuid();
@@ -47,7 +53,7 @@ class CvUploadService {
   }
 
   /// Returns null if the user cancels the picker.
-  static Future<String?> pickAndUpload() async {
+  static Future<UploadedCv?> pickAndUpload() async {
     final user = SupabaseConfig.client.auth.currentUser;
     if (user == null) {
       throw StateError('Sign in before uploading your CV');
@@ -78,13 +84,14 @@ class CvUploadService {
     );
 
     try {
-      await client.from('cvs').insert({
+      final metadata = await client.from('cvs').insert({
         'user_id': user.id,
         'storage_path': path,
         'original_name': picked.name,
         'mime_type': mime,
         'size_bytes': bytes.length,
-      });
+      }).select('id').single();
+      return UploadedCv(id: metadata['id'] as String, name: picked.name);
     } catch (_) {
       // Compensate for an orphaned private object if metadata insert fails.
       try {
@@ -94,6 +101,5 @@ class CvUploadService {
       }
       rethrow;
     }
-    return picked.name;
   }
 }
