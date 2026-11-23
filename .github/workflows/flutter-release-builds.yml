@@ -47,6 +47,7 @@ jobs:
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+          CV_ATS_ANALYSIS_ENABLED: ${{ vars.CV_ATS_ANALYSIS_ENABLED }}
         run: |
           if [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
             echo "::error::Set GitHub Actions variable SUPABASE_PUBLISHABLE_KEY (public key from Supabase)."
@@ -62,10 +63,11 @@ jobs:
             --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
             --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
-            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+            --dart-define=CV_ATS_ANALYSIS_ENABLED="${CV_ATS_ANALYSIS_ENABLED:-false}"
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+          CV_ATS_ANALYSIS_ENABLED: ${{ vars.CV_ATS_ANALYSIS_ENABLED }}
       - name: Upload Android APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -79,10 +81,11 @@ jobs:
             --dart-define=SUPABASE_URL=https://uqtyxhkevnyjvhwdgkyh.supabase.co \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY}" \
             --dart-define=CV_ATS_API_URL="${CV_ATS_API_URL}" \
-            --dart-define=CV_ATS_ANALYSIS_ENABLED=false
+            --dart-define=CV_ATS_ANALYSIS_ENABLED="${CV_ATS_ANALYSIS_ENABLED:-false}"
         env:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           CV_ATS_API_URL: ${{ vars.CV_ATS_API_URL }}
+          CV_ATS_ANALYSIS_ENABLED: ${{ vars.CV_ATS_ANALYSIS_ENABLED }}
       - name: Upload Web release build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
