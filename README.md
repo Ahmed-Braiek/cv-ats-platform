@@ -12,7 +12,7 @@ A candidate can upload a CV and compare it to a job description. The system extr
 | Flutter Android build | CI workflow added; successful APK and device testing not yet confirmed |
 | Supabase | Tables, private storage, auth-linked profiles, subscriptions, RLS, queued analyses and result tables |
 | NestJS API | Deployed to Vercel; health/plans HTTP 200; publishable configuration set, authenticated tests pending |
-| Gemini worker | Supabase Edge function `process-cv` deployed ACTIVE; real Gemini calls await protected API credentials and validation. Dedicated Node worker code remains |
+| Gemini worker | Supabase Edge function `process-cv` ACTIVE (scoring v0.2); the legacy Node worker remains separate and unupgraded |
 | Visitor-before-login analysis | Planned; current upload requires sign-in |
 | Premium payment and admin management | UI only; secure backend workflows pending |
 
@@ -33,6 +33,7 @@ A candidate can upload a CV and compare it to a job description. The system extr
 - **Vercel variables and where to get them:** [Environment variable map](docs/deployment/environment-variable-map.md)
 - **System architecture:** [Architecture overview](docs/architecture/overview.md)
 - **Database design:** [Data model](docs/architecture/database-plan.md)
+- **Scoring v0.2 (evidence, weights, tests):** [Rubric and user study](docs/architecture/scoring-v0.2.md)
 - **AI pipeline and safety:** [Gemini milestone](docs/architecture/gemini-analysis-milestone.md)
 - **Deployment:** [Vercel API guide](docs/deployment/vercel-api.md)
 - **Web + APK + Worker release:** [Release runbook](docs/deployment/web-android-worker-runbook.md)
