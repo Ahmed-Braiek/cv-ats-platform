@@ -2,7 +2,7 @@
 
 **Verified 2026-11-23** using the connected Vercel project `cv-ats-api`:
 - Existing: `SUPABASE_URL`
-- Missing: `SUPABASE_PUBLISHABLE_KEY`
+- Configured: `SUPABASE_PUBLISHABLE_KEY`
 - Project: https://vercel.com/ahmed-braieks-projects/cv-ats-api/settings/environment-variables
 - Supabase: https://supabase.com/dashboard/project/uqtyxhkevnyjvhwdgkyh/settings/api-keys
 
@@ -11,8 +11,8 @@
 | Variable | Required | Where to obtain | Notes |
 | --- | --- | --- | --- |
 | `SUPABASE_URL` | Yes | Supabase dashboard → Project Settings → Data API / Project URL, or Connect dialog | Already configured as `https://uqtyxhkevnyjvhwdgkyh.supabase.co` |
-| `SUPABASE_PUBLISHABLE_KEY` | **Yes** | Supabase dashboard → Settings → API Keys → **Publishable key** (starts `sb_publishable_`) | Add as Vercel environment variable for Production, Preview and Development |
-| `CORS_ORIGINS` | Only for browser frontends | Exact browser origin(s) of future admin or web app, e.g. `https://YOUR-WEB-HOST` | Comma-separated. Not necessary for Flutter Android. No trailing slash and no wildcard. |
+| `SUPABASE_PUBLISHABLE_KEY` | **Yes** | Supabase dashboard → Settings → API Keys → **Publishable key** (starts `sb_publishable_`) | Already configured for Vercel API and Vercel Web |
+| `CORS_ORIGINS` | Yes for Flutter Web | `https://cv-ats-web-ahmed-braieks-projects.vercel.app` | Already configured for the API; redeploy required when changed. |
 
 Save changes and **redeploy** the API; a prior deployment will not inherit newly added variables.
 
@@ -74,3 +74,25 @@ Official references:
 - https://supabase.com/docs/guides/getting-started/api-keys
 - https://vercel.com/docs/environment-variables
 - https://ai.google.dev/gemini-api/docs/rate-limits
+
+## 5. Supabase Edge Function `process-cv` (new active deployment)
+
+The Edge processor is deployed, but **live Gemini analysis is NOT enabled** until you configure the private model API key, test with synthetic files and explicitly enable the mobile feature flag.
+
+Open: https://supabase.com/dashboard/project/uqtyxhkevnyjvhwdgkyh/functions/secrets
+
+Required variables:
+- `GEMINI_API_KEY_PRIMARY` — create in Google AI Studio https://aistudio.google.com/apikey
+- `GEMINI_MODEL_OCR` — a supported PDF/image-capable Gemini model ID (e.g. `gemini-2.5-flash-lite` if available)
+- `GEMINI_MODEL_ANALYSIS` — compatible job-extraction model (can initially be the same model ID)
+
+Optional `GEMINI_API_KEY_SECONDARY`, `GEMINI_API_KEY_TERTIARY`, `GEMINI_MODEL_FALLBACK`, `GEMINI_MODEL_TERTIARY`.
+
+**Do not** add Supabase service-role keys to GitHub/Vercel Web/Flutter. Hosted Edge Functions receive protected Supabase context automatically. The API key stays inside Edge Function Secrets.
+
+For GitHub Actions → Settings → Secrets and variables → Actions → **Variables**, set:
+- `SUPABASE_PUBLISHABLE_KEY` — public client key
+- `CV_ATS_API_URL` — `https://cv-ats-api-ahmed-braieks-projects.vercel.app`
+- `CV_ATS_ANALYSIS_ENABLED` — optional; `false` until end-to-end AI testing succeeds.
+
+See [Supabase Edge worker guide](supabase-edge-worker.md) and [email verification template](../auth/email-code-setup.md).
