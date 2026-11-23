@@ -246,6 +246,7 @@ class NewAnalysisScreen extends StatefulWidget {
 class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   final _jobDescription = TextEditingController();
   final _jobTitle = TextEditingController();
+  static const analysisEnabled = bool.fromEnvironment('CV_ATS_ANALYSIS_ENABLED', defaultValue:false);
   bool _uploading = false;
   bool _submitting = false;
   String? _uploadedCvId;
@@ -271,7 +272,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
       setState(() {
         _uploadedCvId = uploaded.id;
         _uploadedFile = uploaded.name;
-        _uploadMessage = 'CV securely uploaded. AI analysis is not available yet.';
+        _uploadMessage = 'CV uploaded privately. Add a job description to continue.';
       });
     } catch (error) {
       if (mounted) setState(() => _uploadMessage = 'Upload failed: $error');
@@ -315,69 +316,136 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PageShell(
-      title: 'New analysis',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Analyze your application',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Upload your CV and add a job description.',
-              style: TextStyle(color: Color(0xFF64748B))),
-          const SizedBox(height: 22),
-          InkWell(
-            onTap: _uploading ? null : _pickCv,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF93C5FD), width: 2),
-              ),
-              child: Column(children: [
-                const Icon(Icons.upload_file_rounded, size: 48, color: AtsPalette.brand),
-                const SizedBox(height: 12),
-                Text(_uploadedFile ?? 'Choose a CV', style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold,
-                )),
-                const SizedBox(height: 8),
-                const Text('PDF, DOCX, PNG or JPG • up to 10 MB',
-                  style: TextStyle(color: Color(0xFF64748B))),
-                const SizedBox(height: 12),
-                Text(_uploading ? 'Uploading securely...' : 'Tap to select and upload your CV',
-                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+    final onSurface=Theme.of(context).colorScheme.onSurface;
+    return AtsPage(
+      title:'New analysis',
+      child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const AtsEyebrow('STEP BY STEP'),
+        const SizedBox(height:10),
+        Text('Analyze your application',
+          style:Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight:FontWeight.w900)),
+        const SizedBox(height:8),
+        Text('Two simple inputs. Two different insights.',
+          style:TextStyle(color:onSurface.withValues(alpha:.65))),
+        const SizedBox(height:25),
+        Row(children:[
+          _StepBadge(number:'1',label:'Your CV',active:true),
+          const SizedBox(width:9),
+          Expanded(child:Divider(color:onSurface.withValues(alpha:.15))),
+          const SizedBox(width:9),
+          const _StepBadge(number:'2',label:'Job details',active:false),
+        ]),
+        const SizedBox(height:24),
+        const AtsSectionTitle('Upload your CV',
+          subtitle:'Start with the document you plan to send.'),
+        const SizedBox(height:12),
+        Material(
+          color:Theme.of(context).colorScheme.surface,
+          clipBehavior:Clip.antiAlias,
+          borderRadius:BorderRadius.circular(20),
+          child:InkWell(
+            onTap:_uploading?null:_pickCv,
+            child:Container(
+              width:double.infinity,
+              padding:const EdgeInsets.fromLTRB(20,28,20,28),
+              decoration:BoxDecoration(borderRadius:BorderRadius.circular(20),
+                border:Border.all(color:_uploadedCvId != null
+                  ?AtsPalette.success:AtsPalette.brand.withValues(alpha:.55),
+                  width:1.5)),
+              child:Column(children:[
+                Container(padding:const EdgeInsets.all(16),
+                  decoration:BoxDecoration(
+                    color:(_uploadedCvId!=null?AtsPalette.success:AtsPalette.brand)
+                      .withValues(alpha:.1),shape:BoxShape.circle),
+                  child:Icon(_uploadedCvId!=null
+                    ?Icons.check_circle_rounded:Icons.upload_file_rounded,
+                    color:_uploadedCvId!=null?AtsPalette.success:AtsPalette.brand,
+                    size:32)),
+                const SizedBox(height:13),
+                Text(_uploadedFile??'Tap to choose your CV',
+                  maxLines:2,overflow:TextOverflow.ellipsis,
+                  textAlign:TextAlign.center,
+                  style:const TextStyle(fontWeight:FontWeight.w800,fontSize:17)),
+                const SizedBox(height:8),
+                const Text('PDF, DOCX, PNG or JPG · 10 MB maximum',
+                  style:TextStyle(fontSize:12,color:AtsPalette.muted)),
+                const SizedBox(height:14),
+                if(_uploading)const LinearProgressIndicator(),
+                if(!_uploading)Text(_uploadedCvId!=null
+                  ?'Change file':'Choose a file from your device',
+                  style:const TextStyle(color:AtsPalette.brand,
+                    fontWeight:FontWeight.w700)),
               ]),
             ),
           ),
-          if (_uploadMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(_uploadMessage!, style: const TextStyle(fontSize: 13)),
-          ],
-          const SizedBox(height: 22),
-          TextField(
-            controller: _jobTitle,
-            decoration: const InputDecoration(labelText: 'Job title (optional)'),
-          ),
-          const SizedBox(height: 18),
-          TextField(
-            controller: _jobDescription,
-            minLines: 5,
-            maxLines: 10,
-            decoration: const InputDecoration(labelText: 'Job description', alignLabelWithHint: true),
-          ),
-          const SizedBox(height: 20),
-          const Text('Upload a CV, enter a real job description, then submit it for processing by the backend. Processing requires the deployed API and Gemini worker.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: (_uploadedCvId == null || _submitting) ? null : _submitAnalysis,
-            child: Text(_submitting ? 'Submitting...' : 'Analyze my application'),
-          ),
+        ),
+        const SizedBox(height:10),
+        const Row(children:[
+          Icon(Icons.lock_outline,color:AtsPalette.success,size:17),
+          SizedBox(width:7),
+          Expanded(child:Text(
+            'Stored privately in your account. Sign-in is required for upload.',
+            style:TextStyle(color:AtsPalette.muted,fontSize:12))),
+        ]),
+        const SizedBox(height:25),
+        const AtsSectionTitle('Describe the role',
+          subtitle:'Paste the original description to compare relevant requirements.'),
+        const SizedBox(height:13),
+        AtsPanel(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+          TextField(controller:_jobTitle,textInputAction:TextInputAction.next,
+            decoration:const InputDecoration(
+              prefixIcon:Icon(Icons.work_outline_rounded),
+              labelText:'Job title (optional)',
+              hintText:'e.g. Junior Flutter Developer')),
+          const SizedBox(height:13),
+          TextField(controller:_jobDescription,
+            minLines:7,maxLines:12,maxLength:16000,
+            decoration:const InputDecoration(
+              labelText:'Job description',
+              alignLabelWithHint:true,
+              hintText:'Paste duties, required skills, experience and qualifications…')),
+          const SizedBox(height:7),
+          const Text('We only compare requirements explicitly present in the description.',
+            style:TextStyle(color:AtsPalette.muted,fontSize:12)),
+        ])),
+        if(_uploadMessage!=null)...[
+          const SizedBox(height:15),
+          AtsPanel(padding:const EdgeInsets.all(14),child:Row(children:[
+            const Icon(Icons.info_outline,color:AtsPalette.brand,size:19),
+            const SizedBox(width:9),
+            Expanded(child:Text(_uploadMessage!,
+              style:const TextStyle(fontSize:12,height:1.4))),
+          ])),
         ],
-      ),
+        const SizedBox(height:22),
+        FilledButton.icon(
+          onPressed:_uploadedCvId==null || _submitting || !analysisEnabled
+            ?null:_submitAnalysis,
+          icon:Icon(_submitting?Icons.hourglass_top:Icons.auto_awesome),
+          label:Text(_submitting?'Submitting securely...':'Analyze my application'),
+        ),
+        const SizedBox(height:12),
+        Text(analysisEnabled
+          ?'Your request enters a secure queue. Results appear when processing finishes.'
+          :'Live analysis will be enabled after the Gemini worker and end-to-end tests are verified.',
+          textAlign:TextAlign.center,
+          style:const TextStyle(color:AtsPalette.muted,fontSize:12,height:1.4)),
+      ]),
     );
   }
+}
+
+class _StepBadge extends StatelessWidget {
+  const _StepBadge({required this.number,required this.label,required this.active});
+  final String number,label;
+  final bool active;
+  @override Widget build(BuildContext context)=>Row(children:[
+    CircleAvatar(radius:16,
+      backgroundColor:active?AtsPalette.brand:AtsPalette.brand.withValues(alpha:.1),
+      child:Text(number,style:TextStyle(
+        fontWeight:FontWeight.w800,color:active?Colors.white:AtsPalette.brand))),
+    const SizedBox(width:6),
+    Text(label,style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
+  ]);
 }
