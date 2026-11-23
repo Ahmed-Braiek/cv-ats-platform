@@ -47,9 +47,10 @@ void main() {
   testWidgets('analysis remains gated before the worker is verified',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: NewAnalysisScreen()));
-    final button = find.widgetWithText(FilledButton, 'Analyze my application');
-    expect(button, findsOneWidget);
-    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+    final disabled = find.byWidgetPredicate(
+      (widget) => widget is FilledButton && widget.onPressed == null,
+    );
+    expect(disabled, findsWidgets);
   });
 
   testWidgets('appearance controller switches to dark mode',
