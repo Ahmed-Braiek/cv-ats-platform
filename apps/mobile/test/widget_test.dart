@@ -1,34 +1,62 @@
 import 'package:cv_ats_mobile/main.dart';
+import 'package:cv_ats_mobile/features/auth/auth_screen.dart';
 import 'package:cv_ats_mobile/ui/ats_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('visitor sees core proposition and opens analysis flow', (tester) async {
+  tearDown(() {
+    AtsAppearance.mode.value = ThemeMode.system;
+  });
+
+  testWidgets('opens directly on Sign in, not a marketing home page',
+      (tester) async {
     await tester.pumpWidget(const CvAtsApp());
-    expect(find.text('Analyze my CV'), findsOneWidget);
-    expect(find.textContaining('Know how your CV'), findsOneWidget);
+    expect(find.byType(AuthScreen), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Know how your CV'), findsNothing);
+  });
 
-    await tester.tap(find.text('Analyze my CV'));
+  testWidgets('Create account tab reveals name and password confirmation',
+      (tester) async {
+    await tester.pumpWidget(const CvAtsApp());
+    await tester.tap(find.text('Create account').first);
     await tester.pumpAndSettle();
-    expect(find.byType(NewAnalysisScreen), findsOneWidget);
-    expect(find.text('Job description'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.text('Full name'), findsOneWidget);
+    expect(find.text('Confirm password'), findsOneWidget);
+    expect(find.text('Create your account'), findsOneWidget);
+
+    await tester.tap(find.text('Sign in').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
-  testWidgets('analysis cannot be submitted while worker is disabled', (tester) async {
+  testWidgets('verification code screen offers one pasteable six-digit field',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: VerificationCodeScreen(email: 'test@example.com'),
+    ));
+    expect(find.text('Check your inbox.'), findsOneWidget);
+    expect(find.text('test@example.com'), findsOneWidget);
+    expect(find.text('Verification code'), findsOneWidget);
+    final input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.maxLength, 6);
+    expect(find.text('Verify and continue'), findsOneWidget);
+  });
+
+  testWidgets('analysis remains gated before the worker is verified',
+      (tester) async {
     await tester.pumpWidget(const MaterialApp(home: NewAnalysisScreen()));
-    final submit = find.widgetWithText(FilledButton, 'Analyze my application');
-    expect(submit, findsOneWidget);
-    expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+    final button = find.widgetWithText(FilledButton, 'Analyze my application');
+    expect(button, findsOneWidget);
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
   });
 
-  testWidgets('visual system supports light and dark modes', (tester) async {
+  testWidgets('appearance controller switches to dark mode',
+      (tester) async {
     AtsAppearance.mode.value = ThemeMode.dark;
     await tester.pumpWidget(const CvAtsApp());
-    expect(Theme.of(tester.element(find.byType(LandingScreen))).brightness,
-      Brightness.dark);
-    AtsAppearance.mode.value = ThemeMode.system;
-    await tester.pump();
+    expect(Theme.of(tester.element(find.byType(AuthScreen))).brightness,
+        Brightness.dark);
   });
 }
