@@ -72,17 +72,36 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
   Future<void> _start()async{
     if(restarting)return;
     setState(()=>restarting=true);
-    final started=await AnalysisApi.startProcessing(widget.analysisId);
-    if(!mounted)return;
-    setState((){
-      restarting=false;
-      error=started?null:'The processor did not accept this job. '
-        'Check its configuration or contact an administrator.';
-    });
-    if(started)await _refresh();
+    try {
+      final started=await AnalysisApi.startProcessing(widget.analysisId);
+      if(!mounted)return;
+      setState((){
+        error=started?null:'The processor did not accept this job. '
+          'Check its configuration or contact an administrator.';
+      });
+      if(started)await _refresh();
+    } catch (_) {
+      if(mounted)setState(()=>error=
+        'Could not contact the processor. Check your connection and retry.');
+    } finally {
+      if(mounted)setState(()=>restarting=false);
+    }
   }
   @override Widget build(BuildContext context){
     if(payload?['ready']==true)return AnalysisReportScreen(payload:payload!);
+    if(payload==null&&error!=null){
+      return AtsPage(title:'CV analysis',child:AtsEmptyState(
+        icon:Icons.wifi_off_rounded,
+        title:'We could not reach your analysis',
+        description:'Your request has not been lost. Check your connection '
+          'and retry loading its current processing status.',
+        action:FilledButton.icon(
+          onPressed:_refresh,
+          icon:const Icon(Icons.refresh_rounded),
+          label:const Text('Retry status check'),
+        ),
+      ));
+    }
     final analysis=payload?['analysis'] as Map<String,dynamic>?;
     final status=analysis?['status'] as String? ?? 'queued';
     final failed=['failed','expired','cancelled'].contains(status);
@@ -90,7 +109,11 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
     final onSurface=Theme.of(context).colorScheme.onSurface;
     return AtsPage(title:'CV analysis',actions:[
       IconButton(tooltip:'Refresh the processing status',
-        onPressed:_refresh,icon:const Icon(Icons.refresh_rounded)),
+        onPressed:refreshing?null:_refresh,
+        icon:refreshing
+          ?const SizedBox(width:20,height:20,
+            child:CircularProgressIndicator(strokeWidth:2))
+          :const Icon(Icons.refresh_rounded)),
     ],child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const SizedBox(height:9),
       Row(children:[
@@ -159,8 +182,8 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
       ])),
       if(error!=null)...[
         const SizedBox(height:15),
-        _Notice(icon:Icons.wifi_off_outlined,message:error!,
-          color:AtsPalette.danger),
+        AtsInfoStrip(icon:Icons.wifi_off_outlined,message:error!,
+          warning:true),
       ],
       if(status=='queued')...[
         const SizedBox(height:18),
@@ -181,7 +204,7 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
         message:'Your document remains private. The app will keep the result '
           'in your history when processing completes.'),
       const SizedBox(height:13),
-      Center(child:TextButton.icon(onPressed:_refresh,
+      Center(child:TextButton.icon(onPressed:refreshing?null:_refresh,
         icon:const Icon(Icons.refresh_rounded,size:17),
         label:const Text('Refresh now'))),
       const SizedBox(height:7),
@@ -210,7 +233,7 @@ class _PhaseRow extends StatelessWidget{
             Icon(phase.$4,size:21,color:tone)),
         if(!last)Container(width:2,height:34,
           color:complete?AtsPalette.success.withValues(alpha:.35):
-            AtsPalette.stroke),
+            Theme.of(context).dividerColor),
       ]),
       const SizedBox(width:14),
       Expanded(child:Padding(padding:const EdgeInsets.only(top:2,bottom:25),
@@ -224,8 +247,9 @@ class _PhaseRow extends StatelessWidget{
               child:CircularProgressIndicator(strokeWidth:2.1)),
           ]),
           const SizedBox(height:5),
-          Text(phase.$3,style:const TextStyle(
-            color:AtsPalette.muted,fontSize:12,height:1.45)),
+          Text(phase.$3,style:TextStyle(
+            color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.7),
+            fontSize:12,height:1.45)),
           if(complete)...[
             const SizedBox(height:5),
             const Text('Complete',style:TextStyle(
