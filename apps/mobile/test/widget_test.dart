@@ -7,8 +7,7 @@ void main() {
   testWidgets('visitor sees core proposition and opens analysis flow', (tester) async {
     await tester.pumpWidget(const CvAtsApp());
     expect(find.text('Analyze my CV'), findsOneWidget);
-    expect(find.text('ATS compatibility'), findsWidgets);
-    expect(find.text('Job Match'), findsWidgets);
+    expect(find.textContaining('Know how your CV'), findsOneWidget);
 
     await tester.tap(find.text('Analyze my CV'));
     await tester.pumpAndSettle();
