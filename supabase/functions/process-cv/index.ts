@@ -153,9 +153,16 @@ async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
       throw new Error("invalid_job_json");
     await admin.from("analyses").update({status:"scoring"}).eq("id",analysisId);
     const result = evaluateV2(cv,requirements.data,String(j.data.raw_text));
+    // Preserve structured facts and the short scored evidence quotations, not
+    // another full copy of the private CV transcription in the profile table.
+    const { raw_text: extractedText, ...documentMetadata } = cv.document;
+    const persistedProfile = {
+      ...cv,
+      document: { ...documentMetadata, characters: String(extractedText).length },
+    };
     const saved = await admin.rpc("cv_ats_edge_complete",{
       p_analysis_id:analysisId,
-      p_profile:cv,
+      p_profile:persistedProfile,
       p_model:extraction.model,
       p_ats:result.ats,
       p_match:result.match,
