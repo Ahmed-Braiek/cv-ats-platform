@@ -1,0 +1,10 @@
+{
+  "name": "CV ATS Analysis",
+  "short_name": "CV ATS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F8FD",
+  "theme_color": "#315BEB",
+  "description": "ATS compatibility, job matching, and evidence-based CV improvements.",
+  "orientation": "portrait-primary"
+}
