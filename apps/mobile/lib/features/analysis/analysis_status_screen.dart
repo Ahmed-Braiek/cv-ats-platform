@@ -221,7 +221,6 @@ class _AtsTab extends StatelessWidget{
           Text('${entry.value} / ${maxima[entry.key] ?? 0}',
             style:const TextStyle(color:AtsPalette.brand,fontWeight:FontWeight.w900)),
         ]))),
-      ),
       const SizedBox(height:12),
       const Text('Rubric version: ats-match-v0.1. This baseline still requires external ATS validation.',
         style:TextStyle(color:AtsPalette.muted,fontSize:12)),
