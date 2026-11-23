@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/supabase_config.dart';
@@ -282,6 +283,49 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
   @override void initState(){super.initState();_load();}
   void _load()=>_documents=_myRows(
     'cvs','id,original_name,mime_type,size_bytes,storage_path,uploaded_at','uploaded_at');
+
+  Future<void> _copyLink(Map<String,dynamic> file)async{
+    try{
+      final link=await SupabaseConfig.client.storage.from('cv-private')
+        .createSignedUrl(file['storage_path'] as String,60);
+      await Clipboard.setData(ClipboardData(text:link));
+      if(!mounted)return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('Secure viewing link copied. Expires in 60 seconds.')));
+    }catch(_){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('Could not create private viewing link.')));
+    }
+  }
+  Future<void> _deleteCv(Map<String,dynamic> file)async{
+    final name=file['original_name'] as String? ?? 'this CV';
+    final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+      title:const Text('Permanently delete this CV?'),
+      content:Text('Removing "$name" will also delete its '
+        'analyses, scores and recommendations. This action cannot be undone.'),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Keep CV')),
+        FilledButton(onPressed:()=>Navigator.pop(ctx,true),
+          style:FilledButton.styleFrom(backgroundColor:AtsPalette.danger),
+          child:const Text('Delete CV and results')),
+      ],
+    ));
+    if(confirmed!=true||!mounted)return;
+    try{
+      await SupabaseConfig.client.storage.from('cv-private')
+        .remove([file['storage_path'] as String]);
+      await SupabaseConfig.client.rpc('cv_ats_delete_own_cv',
+        params:{'p_cv_id':file['id']});
+      if(!mounted)return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('CV and linked results deleted.')));
+      setState(_load);
+    }catch(_){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:Text('Deletion could not be completed. Please try again.')));
+    }
+  }
+
   @override Widget build(BuildContext context)=>AtsPage(
     title:'CV library',
     actions:[IconButton(icon:const Icon(Icons.refresh),tooltip:'Refresh',
@@ -315,11 +359,23 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
                   const SizedBox(height:6),
                   Text('${((file['size_bytes'] as num? ?? 0)/1024).toStringAsFixed(0)} KB'),
                   const SizedBox(height:15),
-                  const Text('Document preview and deletion controls will be enabled after secure file-lifecycle testing.',
-                    style:TextStyle(color:AtsPalette.muted)),
-                  const SizedBox(height:22),
-                  OutlinedButton(onPressed:()=>Navigator.pop(ctx),
-                    child:const Text('Close')),
+                  const Text('Only you can access this private CV. '
+                    'Temporary viewing links expire after 60 seconds.',
+                    style:TextStyle(color:AtsPalette.muted,height:1.5)),
+                  const SizedBox(height:17),
+                  SizedBox(width:double.infinity,child:OutlinedButton.icon(
+                    icon:const Icon(Icons.link_rounded),
+                    onPressed:(){Navigator.pop(ctx);_copyLink(file);},
+                    label:const Text('Copy temporary viewing link'))),
+                  const SizedBox(height:9),
+                  SizedBox(width:double.infinity,child:OutlinedButton.icon(
+                    icon:const Icon(Icons.delete_outline_rounded),
+                    style:OutlinedButton.styleFrom(foregroundColor:AtsPalette.danger),
+                    onPressed:(){Navigator.pop(ctx);_deleteCv(file);},
+                    label:const Text('Delete CV and linked analyses'))),
+                  const SizedBox(height:7),
+                  Center(child:TextButton(onPressed:()=>Navigator.pop(ctx),
+                    child:const Text('Close'))),
                 ]),
               ))),
             child:Row(children:[
