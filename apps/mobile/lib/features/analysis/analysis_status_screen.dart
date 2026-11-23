@@ -128,7 +128,7 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
               const Text('CURRENT STAGE',style:TextStyle(color:Color(0xFF87E3DD),
                 fontWeight:FontWeight.w900,fontSize:10,letterSpacing:1.4)),
               const SizedBox(height:5),
-              Text(failed?'Requires attention':phases[phaseIndex.clamp(0,4)].$2,
+              Text(failed?'Requires attention':phases[phaseIndex.clamp(0,4).toInt()].$2,
                 style:const TextStyle(color:Colors.white,fontSize:17,
                   fontWeight:FontWeight.w800)),
             ])),
@@ -203,7 +203,7 @@ class _PhaseRow extends StatelessWidget{
         AnimatedContainer(duration:const Duration(milliseconds:250),
           width:40,height:40,
           decoration:BoxDecoration(
-            color:tone.withValues(alpha:active?.14:.08),
+            color:tone.withValues(alpha:active ? .14 : .08),
             borderRadius:BorderRadius.circular(13),
             border:active?Border.all(color:tone.withValues(alpha:.5)):null),
           child:complete?const Icon(Icons.check_rounded,color:AtsPalette.success):
