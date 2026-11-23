@@ -18,6 +18,41 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen> {
   Map<String,dynamic>? payload;
   String? error;
   bool refreshing=false;
+  bool restarting=false;
+
+  String _diagnostic(String? code) {
+    switch(code){
+      case 'cv_evidence_insufficient':
+      case 'invalid_cv_json':
+      case 'empty_docx':
+        return 'We could not extract enough reliable CV text. Try a text-based PDF or DOCX.';
+      case 'job_requirements_not_grounded':
+      case 'invalid_job_json':
+      case 'no_job_requirements':
+        return 'The job requirements could not be verified. Paste the complete posting and try a new analysis.';
+      case 'rate_limited':
+        return 'The analysis provider is currently at capacity. Please try a new analysis later.';
+      case 'gemini_config_error':
+      case 'gemini_not_configured':
+        return 'The AI service configuration needs attention. Please contact support.';
+      case 'result_save_failed':
+        return 'The results could not be saved securely. Please try again.';
+      default:
+        return 'This analysis could not finish. Please check the input and try again.';
+    }
+  }
+
+  Future<void> _tryStart() async {
+    if(restarting)return;
+    setState(() { restarting=true; error=null; });
+    final ok=await AnalysisApi.startProcessing(widget.analysisId);
+    if(!mounted)return;
+    setState(() { restarting=false;
+      if(!ok)error='The processor did not start. Check the service configuration and retry.';
+    });
+    if(ok) await _refresh();
+  }
+
   @override void initState() {
     super.initState();
     _refresh();
@@ -45,6 +80,7 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen> {
     final ready=payload?['ready']==true;
     final analysis=payload?['analysis'] as Map<String,dynamic>?;
     final status=(analysis?['status'] as String?) ?? 'queued';
+    final failed=['failed','expired','cancelled'].contains(status);
     if(!ready)return AtsPage(title:'CV analysis',actions:[
       IconButton(tooltip:'Refresh status',
         onPressed:_refresh,icon:const Icon(Icons.refresh_rounded)),
@@ -54,7 +90,7 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen> {
         decoration:BoxDecoration(
           color:AtsPalette.brand.withValues(alpha:.09),
           shape:BoxShape.circle),
-        child:Icon(['failed','cancelled','expired'].contains(status)
+        child:Icon(failed
           ?Icons.error_outline:Icons.hourglass_top_rounded,
           color:Theme.of(context).colorScheme.primary,size:45)),
       const SizedBox(height:22),
@@ -83,6 +119,10 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen> {
           style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
       ])),
       const SizedBox(height:18),
+      if(status=='queued') FilledButton.icon(onPressed:restarting?null:_tryStart,
+        icon:const Icon(Icons.play_arrow_rounded),
+        label:Text(restarting?'Starting...':'Start processing')),
+      const SizedBox(height:10),
       OutlinedButton.icon(onPressed:_refresh,
         icon:const Icon(Icons.refresh_rounded),label:const Text('Refresh status')),
       const SizedBox(height:22),
