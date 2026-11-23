@@ -91,7 +91,7 @@ export function evaluateV2(extraction: unknown, jobInput: unknown, jobDescriptio
     // A branded platform is never proven by generic ERP/dashboards alone.
     if(status==="direct"&&category==="tool"){
       const brands=label.match(/\b(?:Google Analytics|GA4|HubSpot|Salesforce|Zendesk|Intercom|Mailchimp|Meta Ads|Google Ads)\b/ig);
-      if(brands?.length&&!brands.some(x=>cv.includes(norm(x))))status="transferable";
+      if(brands?.length&&!brands.some(x=>cv.includes(norm(x))))status="uncertain";
     }
     const fraction=status==="direct"?1:status==="transferable"?.4:0;
     verified.push({
