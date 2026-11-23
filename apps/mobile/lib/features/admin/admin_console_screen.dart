@@ -159,6 +159,15 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
             const Flexible(child:Text('Control room',overflow:TextOverflow.ellipsis)),
           ]),
           actions:[
+            PopupMenuButton<ThemeMode>(
+              tooltip:'Appearance',
+              icon:const Icon(Icons.palette_outlined),
+              onSelected:(mode)=>AtsAppearance.mode.value=mode,
+              itemBuilder:(_)=>const [
+                PopupMenuItem(value:ThemeMode.system,child:Text('Device theme')),
+                PopupMenuItem(value:ThemeMode.light,child:Text('Light theme')),
+                PopupMenuItem(value:ThemeMode.dark,child:Text('Dark theme')),
+              ]),
             IconButton(icon:const Icon(Icons.refresh_rounded),tooltip:'Refresh data',
               onPressed:_reload),
             IconButton(icon:const Icon(Icons.logout_rounded),tooltip:'Sign out',
