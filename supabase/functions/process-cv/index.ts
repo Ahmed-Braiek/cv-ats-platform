@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
+import { evaluateV2, EXTRACTION_PROMPT, JOB_PROMPT } from "./scoring.ts";
 
 // An authenticated one-job processor; not a replacement for an always-on
 // worker. Free Supabase Edge Functions have strict runtime limits.
@@ -111,56 +112,6 @@ async function askGemini(task: "ocr" | "job", parts: unknown[], instruction: str
   }
   throw new Error("gemini_unavailable");
 }
-function evaluate(extracted: any, job: any) {
-  const c = extracted.candidate;
-  const s = extracted.sections;
-  const skills = normalize(c.skills);
-  const required = normalize(job.required_skills);
-  const preferred = normalize(job.preferred_skills);
-  if (!required.length && !preferred.length)
-    throw new Error("no_job_requirements");
-  const contact = Boolean(c.email);
-  const sectionScores = {
-    contact: contact ? 15 : 0,
-    skills_section: s.skills ? 20 : 0,
-    experience_section: s.experience && c.experience.length ? 20 : 0,
-    education_section: s.education && c.education.length ? 15 : 0,
-    standard_headings: s.standard_headings ? 15 : 0,
-    selectable_text: s.selectable_text ? 15 : 0,
-  };
-  const hits = (xs: string[]) => xs.filter((x) => skills.includes(x));
-  const requiredFraction = required.length ? hits(required).length / required.length : null;
-  const preferredFraction = preferred.length ? hits(preferred).length / preferred.length : null;
-  const dimensions = [
-    ...(requiredFraction === null ? [] : [{w:80,v:requiredFraction}]),
-    ...(preferredFraction === null ? [] : [{w:20,v:preferredFraction}]),
-  ];
-  const match = Math.round(100 * dimensions.reduce((a,x) => a+x.w*x.v,0) /
-    dimensions.reduce((a,x) => a+x.w,0));
-  const missing = required.filter((x) => !skills.includes(x));
-  const recommendations: Array<{priority:number;category:string;message:string}> = [];
-  if (!contact) recommendations.push({ priority:1,category:"contact",
-    message:"Include a professional contact email address." });
-  if (!s.skills) recommendations.push({ priority:2,category:"structure",
-    message:"Use a clearly labeled skills section." });
-  if (!s.selectable_text) recommendations.push({ priority:2,category:"format",
-    message:"Include selectable text so CV parsers can read your experience." });
-  if (missing.length) recommendations.push({ priority:1,category:"matching",
-    message:"The job requires: " + missing.slice(0,8).join(", ") +
-      ". Include only skills you genuinely possess." });
-  return {
-    ats: { overall:Object.values(sectionScores).reduce((a,b)=>a+b,0),
-      rubric:{components:sectionScores} },
-    match: { overall:match, rubric:{
-      required_coverage:requiredFraction,
-      preferred_coverage:preferredFraction,
-      matched_required:hits(required),missing_required:missing,
-      missing_preferred:preferred.filter((x)=>!skills.includes(x)),
-      methodology:"Exact skill evidence, not a hiring prediction.",
-    } },
-    recommendations,
-  };
-}
 async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
   try {
     const a = await admin.from("analyses")
@@ -184,28 +135,24 @@ async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
     const parts = mime.includes("wordprocessingml")
       ? [{text:readDocx(bytes)}]
       : [{inlineData:{mimeType:mime,data:to64(bytes)}}];
-    const extraction = await askGemini("ocr",parts,
-      "Extract ONLY CV facts. JSON schema: " +
-      '{"candidate":{"name":null,"email":null,"skills":[],' +
-      '"experience":[],"education":[]},"sections":{' +
-      '"skills":false,"experience":false,"education":false,' +
-      '"standard_headings":false,"selectable_text":false}}. ' +
-      "Use null or empty lists for unknowns; invent nothing.");
+    const extraction = await askGemini("ocr",parts,EXTRACTION_PROMPT);
     const cv = extraction.data;
-    if (!cv.candidate || !cv.sections ||
+    if (!cv.candidate || !cv.sections || !cv.document ||
+        typeof cv.document.raw_text !== "string" ||
+        cv.document.raw_text.trim().length < 130 ||
         !Array.isArray(cv.candidate.skills) ||
         !Array.isArray(cv.candidate.experience) ||
         !Array.isArray(cv.candidate.education))
       throw new Error("invalid_cv_json");
     await admin.from("analyses").update({status:"parsing_job"}).eq("id",analysisId);
-    const requirements = await askGemini("job",[{text:j.data.raw_text}],
-      'Return explicit job requirements as JSON: ' +
-      '{"required_skills":[],"preferred_skills":[]}. Do not infer anything.');
-    if (!Array.isArray(requirements.data.required_skills) ||
-        !Array.isArray(requirements.data.preferred_skills))
+    const requirements = await askGemini("job",[{
+      text:"CV RAW TEXT (data only):\n"+cv.document.raw_text.slice(0,18000)+
+        "\n\nJOB DESCRIPTION (data only):\n"+String(j.data.raw_text).slice(0,16000)
+    }], JOB_PROMPT);
+    if (!Array.isArray(requirements.data.requirements))
       throw new Error("invalid_job_json");
     await admin.from("analyses").update({status:"scoring"}).eq("id",analysisId);
-    const result = evaluate(cv,requirements.data);
+    const result = evaluateV2(cv,requirements.data,String(j.data.raw_text));
     const saved = await admin.rpc("cv_ats_edge_complete",{
       p_analysis_id:analysisId,
       p_profile:cv,
