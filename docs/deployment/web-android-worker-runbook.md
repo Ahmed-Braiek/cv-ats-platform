@@ -7,11 +7,11 @@ This runbook is for **CV ATS Analysis** in the GitHub repository
 
 | Component | Host | Deployment state |
 | --- | --- | --- |
-| Flutter Web | Vercel project `cv-ats-web`, root `apps/mobile` | Build pipeline configured; check Vercel deployment for READY |
+| Flutter Web | Vercel project `cv-ats-web`, root `apps/mobile` | Latest login-first Flutter Web release compiled READY; widget tests passed, essential assets HTTP 200 |
 | Flutter Android APK | GitHub Actions workflow `flutter-release-builds.yml` | Creates a downloadable debug APK as an Actions artifact on success |
 | NestJS API | Vercel project `cv-ats-api`, root `services/api` | Health and plans API validated with HTTP 200 |
 | Supabase | `uqtyxhkevnyjvhwdgkyh` | Auth, database, RLS and private storage configured |
-| Gemini worker | Persistent background process host, **not Vercel** | Pending. Railway workspace trial expired on 2026-11-23. Do not claim live analysis. |
+| Gemini worker | Supabase Edge Function `process-cv` | ACTIVE deploy, but Gemini secrets not configured and live analysis untested. Railway long-running worker remains blocked by expired trial. |
 
 **Deployment is not equivalent to a validated final product.** Gemini needs its own configured worker and integration testing. Flutter's execution feature gate stays disabled until then.
 
@@ -22,7 +22,7 @@ Use these exact names:
 | Key | Value / location | Public? |
 | --- | --- | --- |
 | `SUPABASE_URL` | `https://uqtyxhkevnyjvhwdgkyh.supabase.co` | Yes; already set |
-| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → `sb_publishable_...` | Yes, but do not paste into chat or Git |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → `sb_publishable_...` | Public client key already set on Vercel Web; no need to paste into chat or Git |
 | `CV_ATS_API_URL` | `https://cv-ats-api-ahmed-braieks-projects.vercel.app` | Yes; already set. API domain must be reachable from public browsers without Vercel Authentication |
 | `CV_ATS_ANALYSIS_ENABLED` | `false` until worker passes real end-to-end tests | Yes; already set |
 
@@ -49,6 +49,7 @@ Workflow: **Flutter release builds** (`.github/workflows/flutter-release-builds.
 GitHub repo **Settings → Secrets and variables → Actions → Variables**:
 - `SUPABASE_PUBLISHABLE_KEY` — same public Supabase publishable key.
 - `CV_ATS_API_URL` — accessible HTTPS API URL.
+- `CV_ATS_ANALYSIS_ENABLED` — optional; keep `false` until AI job processing passes integration tests.
 
 These are intended **public** values: they are embedded into the web JS and APK binaries. Do not put privileged keys in GitHub variables.
 
@@ -75,7 +76,7 @@ Do not configure Gemini secrets in Vercel Web or Flutter. Use a persistent Node.
 
 Project-level rate limits apply **per Google project**, not per key. Do not rotate keys to evade quotas.
 
-Current blocker: the connected Railway account reports **trial expired**. No worker service was created; no credit card or paid service was provisioned. Alternative connected Render workspace belongs to a different account, so we did not deploy the worker there without permission.
+Current alternative: an authenticated Supabase Edge Function (`process-cv`) is deployed but requires protected Gemini secrets. The connected Railway account reports **trial expired**. No worker service was created; no credit card or paid service was provisioned. Alternative connected Render workspace belongs to a different account, so we did not deploy the worker there without permission.
 
 ## Smoke tests
 
