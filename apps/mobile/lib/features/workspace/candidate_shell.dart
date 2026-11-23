@@ -451,8 +451,10 @@ class AccountPage extends StatelessWidget {
             ? (user.userMetadata!['display_name'] as String) : 'Candidate',
             style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w900)),
           const SizedBox(height:5),
-          Text(user.email??'No email address',
-            style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
+          Text(user.email??'No email address',maxLines:2,
+            overflow:TextOverflow.ellipsis,
+            style:TextStyle(color:Theme.of(context).colorScheme.onSurface
+              .withValues(alpha:.68),fontSize:12)),
         ])),
         IconButton(
           tooltip:'Edit your display name',
@@ -472,6 +474,11 @@ class AccountPage extends StatelessWidget {
           ).eq('user_id',user.id).eq('status','active').maybeSingle(),
           builder:(context,s){
             if(!s.hasData&&!s.hasError)return const AtsSkeleton(width:210,height:26);
+            if(s.hasError)return const AtsInfoStrip(
+              icon:Icons.wifi_off_rounded,
+              message:'Your membership details are temporarily unavailable. '
+                'Your account is unchanged. Please try again later.',
+              warning:true);
             final row=s.data is Map?Map<String,dynamic>.from(s.data as Map):<String,dynamic>{};
             final detail=row['subscription_plans'] is Map
               ?Map<String,dynamic>.from(row['subscription_plans'] as Map)
@@ -534,7 +541,7 @@ class AccountPage extends StatelessWidget {
         },
         icon:const Icon(Icons.logout_rounded),label:const Text('Sign out')),
       const SizedBox(height:22),
-      const Center(child:Text('CV ATS · Android first · v0.1',
+      const Center(child:Text('CV ATS · Career Studio',
         style:TextStyle(color:AtsPalette.muted,fontSize:11))),
     ]));
   }
@@ -553,7 +560,8 @@ class SubscriptionPlansPage extends StatelessWidget {
         builder:(context,s){
           if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:2,heading:false);
           if(s.hasError)return const AtsEmptyState(icon:Icons.cloud_off,
-            title:'Plans unavailable',description:'Try again when the network is available.');
+            title:'Plans unavailable',description:'Your plan has not changed. '
+              'Please try again when the connection is restored.');
           final rows=(s.data as List? ?? []);
           return Column(children:[
             for(final data in rows)Padding(
