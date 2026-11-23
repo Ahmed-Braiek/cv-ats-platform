@@ -338,7 +338,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
                 border: Border.all(color: const Color(0xFF93C5FD), width: 2),
               ),
               child: Column(children: [
-                const Icon(Icons.upload_file_rounded, size: 48, color: CvAtsApp.primary),
+                const Icon(Icons.upload_file_rounded, size: 48, color: AtsPalette.brand),
                 const SizedBox(height: 12),
                 Text(_uploadedFile ?? 'Choose a CV', style: const TextStyle(
                   fontSize: 18, fontWeight: FontWeight.bold,
