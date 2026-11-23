@@ -677,9 +677,9 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
                 autofillHints: const [AutofillHints.oneTimeCode],
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 style: const TextStyle(
-                  fontSize: 22,
+                  fontSize: 19,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
+                  letterSpacing: 3,
                 ),
                 decoration: const InputDecoration(
                   hintText: 'Enter the email code',
