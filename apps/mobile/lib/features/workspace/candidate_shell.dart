@@ -5,6 +5,7 @@ import '../../config/supabase_config.dart';
 import '../../main.dart' show NewAnalysisScreen;
 import '../../ui/ats_design.dart';
 import '../analysis/analysis_status_screen.dart';
+import '../admin/admin_console_screen.dart';
 
 class CandidateShell extends StatefulWidget {
   const CandidateShell({super.key, this.initialTab = 0});
@@ -415,7 +416,7 @@ class AccountPage extends StatelessWidget {
           if(role != 'admin')return const SizedBox.shrink();
           return Padding(padding:const EdgeInsets.only(bottom:16),
             child:AtsPanel(onTap:()=>Navigator.of(context).push(
-              MaterialPageRoute<void>(builder:(_)=>const AdminConsolePage())),
+              MaterialPageRoute<void>(builder:(_)=>const AdminConsoleScreen())),
               child:const ListTile(leading:Icon(Icons.admin_panel_settings),
                 title:Text('Administrator console'),
                 trailing:Icon(Icons.chevron_right))));
@@ -549,30 +550,3 @@ class DataPrivacyPage extends StatelessWidget{
     ]));
 }
 
-class AdminConsolePage extends StatefulWidget{
-  const AdminConsolePage({super.key});
-  @override State<AdminConsolePage> createState()=>_AdminConsolePageState();
-}
-class _AdminConsolePageState extends State<AdminConsolePage>{
-  int selected=0;
-  @override Widget build(BuildContext context)=>AtsPage(
-    title:'Administrator',child:Column(
-      crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const AtsHeader(title:'Platform administration',
-          subtitle:'Administration screens require server-enforced permissions.'),
-        Wrap(spacing:8,children:[
-          for(int i=0;i<4;i++)ChoiceChip(label:Text(
-            const ['Overview','Users','Plans & limits','Statistics'][i]),
-            selected:i==selected,onSelected:(_)=>setState(()=>selected=i)),
-        ]),
-        const SizedBox(height:20),
-        AtsEmptyState(
-          icon:const [
-            Icons.dashboard_customize_outlined,Icons.group_outlined,
-            Icons.tune_rounded,Icons.insights_outlined,
-          ][selected],
-          title:const ['Overview','User management','Plan management','System statistics'][selected],
-          description:'The administrator API and role-enforced data views are not connected yet. No simulated user data or fabricated metrics are displayed.',
-        ),
-      ]));
-}
