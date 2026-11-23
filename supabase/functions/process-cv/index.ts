@@ -15,12 +15,15 @@ try {
   if (typeof modern === "string") secret = modern;
 } catch { /* legacy service-role key fallback */ }
 
-const allowedOrigin = "https://cv-ats-web-ahmed-braieks-projects.vercel.app";
+const allowedOrigins = new Set([
+  "https://cv-ats-web.vercel.app",
+  "https://cv-ats-web-ahmed-braieks-projects.vercel.app",
+]);
 function headers(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
   return {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": req.headers.get("origin") === allowedOrigin
-      ? allowedOrigin : "null",
+    "Access-Control-Allow-Origin": allowedOrigins.has(origin) ? origin : "null",
     "Access-Control-Allow-Headers": "authorization,apikey,content-type,x-client-info",
     "Access-Control-Allow-Methods": "POST,OPTIONS",
     "Vary": "Origin",
