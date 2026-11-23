@@ -134,11 +134,12 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           style:TextStyle(color:onSurface.withValues(alpha:.65))),
         const SizedBox(height:25),
         Row(children:[
-          _StepBadge(number:'1',label:'Your CV',active:true),
-          const SizedBox(width:9),
-          Expanded(child:Divider(color:onSurface.withValues(alpha:.15))),
-          const SizedBox(width:9),
-          _StepBadge(number:'2',label:'Job details',active:_jobDescription.text.trim().length>=20),
+          const Flexible(child:_StepBadge(number:'1',label:'Your CV',active:true)),
+          const SizedBox(width:6),
+          SizedBox(width:22,child:Divider(color:onSurface.withValues(alpha:.15))),
+          const SizedBox(width:6),
+          Flexible(child:_StepBadge(number:'2',label:'Job details',
+            active:_jobDescription.text.trim().length>=20)),
         ]),
         const SizedBox(height:24),
         const AtsSectionTitle('Upload your CV',
@@ -266,6 +267,7 @@ class _StepBadge extends StatelessWidget {
       child:Text(number,style:TextStyle(
         fontWeight:FontWeight.w800,color:active?Colors.white:AtsPalette.brand))),
     const SizedBox(width:6),
-    Text(label,style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
+    Flexible(child:Text(label,maxLines:2,overflow:TextOverflow.ellipsis,
+      style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700))),
   ]);
 }
