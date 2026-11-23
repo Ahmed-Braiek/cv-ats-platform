@@ -38,6 +38,22 @@ export class AppController {
     return { data: { id: user.id, email: user.email, profile: data } };
   }
 
+  @Get('cvs')
+  async cvs(
+    @Headers('authorization') authorization?: string,
+  ): Promise<ApiResult<unknown>> {
+    const { token, user } = await this.supabase.verifyBearer(authorization);
+    const { data, error } = await this.supabase.userClient(token)
+      .from('cvs')
+      .select('id,original_name,mime_type,size_bytes,uploaded_at')
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .order('uploaded_at', { ascending: false })
+      .limit(50);
+    if (error) throw new HttpException('Unable to load CVs', HttpStatus.BAD_GATEWAY);
+    return { data: data ?? [] };
+  }
+
   @Get('analyses')
   async analyses(
     @Headers('authorization') authorization?: string,
