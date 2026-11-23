@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config/supabase_config.dart';
-import '../../main.dart' show LandingScreen, NewAnalysisScreen;
+import '../../main.dart' show NewAnalysisScreen;
 import '../../ui/ats_design.dart';
 import '../analysis/analysis_status_screen.dart';
 
@@ -423,10 +423,7 @@ class AccountPage extends StatelessWidget {
       OutlinedButton.icon(
         onPressed:() async {
           await SupabaseConfig.client.auth.signOut();
-          if(context.mounted)Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder:(_)=>const LandingScreen()),
-            (_)=>false,
-          );
+          // SessionGate observes the sign-out event and returns to login.
         },
         icon:const Icon(Icons.logout_rounded),label:const Text('Sign out')),
       const SizedBox(height:22),
