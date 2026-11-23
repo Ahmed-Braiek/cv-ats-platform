@@ -147,6 +147,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
     return LayoutBuilder(builder:(context,box){
       final desktop=box.maxWidth>=850;
       final nav=List.generate(labels.length,(i)=>NavigationDestination(
+        tooltip:labels[i],
         icon:Icon(icons[i]),selectedIcon:Icon(icons[i]),label:labels[i]));
       return Scaffold(
         appBar:AppBar(
@@ -191,7 +192,11 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen>{
             constraints:const BoxConstraints(maxWidth:1000),
             child:FutureBuilder<dynamic>(future:request,builder:(context,s){
               if(s.connectionState!=ConnectionState.done)return const _Busy();
-              if(s.hasError)return _Unavailable(message:s.error.toString(),retry:_reload);
+              if(s.hasError)return _Unavailable(
+                message:'We could not load this admin section. '
+                  'Your settings and account data have not been changed. '
+                  'Check your connection, then retry.',
+                retry:_reload);
               final data=s.data;
               return RefreshIndicator(onRefresh:() async{
                 _reload();
@@ -607,5 +612,6 @@ class _Unavailable extends StatelessWidget{
     child:AtsEmptyState(icon:Icons.cloud_off_outlined,
       title:'Administration unavailable',description:message,
       action:FilledButton.icon(onPressed:retry,
-        icon:const Icon(Icons.refresh),label:const Text('Try again')))));
+        icon:const Icon(Icons.refresh_rounded),
+        label:const Text('Retry admin section')))));
 }
