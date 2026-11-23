@@ -257,7 +257,7 @@ class _Percent extends StatelessWidget{
   const _Percent({required this.label,required this.ratio});
   final String label;final dynamic ratio;
   @override Widget build(BuildContext context){
-    final amount=ratio is num ? ratio.toDouble().clamp(0.0,1.0) : null;
+    final double? amount=ratio is num ? ratio.toDouble().clamp(0.0,1.0).toDouble() : null;
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[
         Expanded(child:Text(label,style:const TextStyle(
@@ -348,7 +348,7 @@ class _Check extends StatelessWidget{
     required this.max,required this.note});
   final String title,note;final int value,max;
   @override Widget build(BuildContext context){
-    final pct=max>0?(value/max).clamp(0.0,1.0):0.0;
+    final double pct=max>0?(value/max).clamp(0.0,1.0).toDouble():0.0;
     final tone=pct>=.85?AtsPalette.success:
       pct>=.5?AtsPalette.brand:AtsPalette.warn;
     return AtsPanel(padding:const EdgeInsets.all(16),
