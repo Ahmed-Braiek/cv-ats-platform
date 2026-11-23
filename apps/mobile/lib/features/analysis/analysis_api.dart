@@ -15,6 +15,22 @@ class AnalysisApi {
       throw StateError('Configure a HTTPS backend API URL');
     }
   }
+  /// Starts a bounded Supabase Edge background task after the NestJS API has
+  /// committed the analysis. Feature-gated until Gemini credentials are ready.
+  static Future<bool> startProcessing(String analysisId) async {
+    const enabled = bool.fromEnvironment('CV_ATS_ANALYSIS_ENABLED',
+        defaultValue: false);
+    if (!enabled || !SupabaseConfig.configured) return false;
+    try {
+      final result = await SupabaseConfig.client.functions.invoke(
+        'process-cv', body: {'analysisId': analysisId},
+      );
+      return result.status == 202;
+    } catch (_) {
+      return false; // Job stays queued; never fabricate completed results.
+    }
+  }
+
   static Future<String> submit({
     required String cvId,
     required String jobDescription,
@@ -34,7 +50,9 @@ class AnalysisApi {
       throw StateError('Submission failed (${response.statusCode})');
     }
     final result=jsonDecode(response.body) as Map<String,dynamic>;
-    return (result['data'] as Map<String,dynamic>)['id'] as String;
+    final id = (result['data'] as Map<String,dynamic>)['id'] as String;
+    await startProcessing(id);
+    return id;
   }
   static Future<Map<String,dynamic>> results(String id) async {
     _validate();
