@@ -95,7 +95,7 @@ test("a direct named software claim must include the named platform",()=>{
  const manipulated=structuredClone(job);
  manipulated.requirements[3].status="direct";
  const r=evaluateV2(cv,manipulated,posting);
- assert.equal(r.match.rubric.requirements[3].status,"transferable");
+ assert.equal(r.match.rubric.requirements[3].status,"uncertain");
 });
 test("empty or unrelated requirement extraction is not silently scored zero",()=>{
  assert.throws(()=>evaluateV2(cv,{requirements:[]},posting),/job_requirements_not_grounded/);
