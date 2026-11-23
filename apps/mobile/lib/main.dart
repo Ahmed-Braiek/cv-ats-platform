@@ -75,7 +75,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
         _uploadedCvId = uploaded.id;
         _uploadedFile = uploaded.name;
         _uploadFailed = false;
-        _uploadMessage = 'CV uploaded privately. Add a job description to continue.';
+        _uploadMessage = null;
       });
     } catch (_) {
       if (mounted) setState(() { _uploadFailed = true;
@@ -234,11 +234,16 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
             Icons.info_outline_rounded,message:_uploadMessage!,warning:_uploadFailed),
         ],
         const SizedBox(height:22),
-        if(_uploadedCvId!=null)const Padding(
-          padding:EdgeInsets.only(bottom:15),
+        if(_uploadedCvId!=null)Padding(
+          padding:const EdgeInsets.only(bottom:15),
           child:AtsInfoStrip(icon:Icons.verified_user_outlined,
-            message:'CV uploaded privately. Add the original job posting for '
-              'a complete evidence-based comparison.')),
+            message:!analysisEnabled
+              ?'Your CV was uploaded securely, but analysis is disabled in this build.'
+              :_jobDescription.text.trim().length>=20
+                ?'Ready to analyze. Your private CV and job posting will be '
+                  'compared against real evidence.'
+                :'CV uploaded privately. Add the original job description '
+                  'to start an evidence-based comparison.')),
         SizedBox(width:double.infinity,child:FilledButton.icon(
           onPressed:_uploadedCvId==null || _uploading || _submitting ||
               _jobDescription.text.trim().length<20 || !analysisEnabled
@@ -249,7 +254,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
         const SizedBox(height:12),
         Text(analysisEnabled
           ?'Your request enters a secure queue. Results appear when processing finishes.'
-          :'Live analysis will be enabled after the Gemini worker and end-to-end tests are verified.',
+          :'This build has analysis disabled. Install the latest CV-ATS build to submit a job.',
           textAlign:TextAlign.center,
           style:const TextStyle(color:AtsPalette.muted,fontSize:12,height:1.4)),
       ]),
