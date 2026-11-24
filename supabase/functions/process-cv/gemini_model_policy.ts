@@ -12,7 +12,8 @@ export function textGenerationModel(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const name = value.trim().replace(/^models\//, "");
   if (!/^gemini-3\.[0-9]+-flash(?:-lite)?(?:-[a-z0-9]+)?$/.test(name)) return null;
-  if (name.endsWith("-preview") || name.endsWith("-exp")) return null;
+  if (/-image(?:-|$)|-tts(?:-|$)|-audio(?:-|$)|-preview$|-exp$/.test(name))
+    return null;
   return name;
 }
 
