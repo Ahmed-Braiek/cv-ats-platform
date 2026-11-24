@@ -43,10 +43,16 @@ class _AnalysisStatusScreenState extends State<AnalysisStatusScreen>{
       case 'no_job_requirements':
         return 'The job requirements could not be verified. Use the complete vacancy text.';
       case 'rate_limited':
-        return 'The analysis provider is currently at capacity. Please retry later.';
+        return 'Google Gemini is rate-limiting this project. Please retry later; this failure does not consume an analysis credit.';
+      case 'gemini_unavailable':
+        return 'Google Gemini could not complete the request. The service may be unavailable; this failure does not consume an analysis credit.';
+      case 'gemini_model_unavailable':
+        return 'The configured Gemini models are not available to this Google project. Ask an administrator to check model access. This failure does not consume an analysis credit.';
       case 'gemini_config_error':
       case 'gemini_not_configured':
-        return 'The AI service needs configuration. Please contact an administrator.';
+        return 'The AI service needs valid API-key or model configuration. Contact an administrator; this failure does not consume an analysis credit.';
+      case 'gemini_dispatch_unavailable':
+        return 'The AI request could not be routed securely. Contact an administrator; this failure does not consume an analysis credit.';
       case 'result_save_failed':
         return 'The report could not be saved securely. Please submit a new analysis.';
       default:
