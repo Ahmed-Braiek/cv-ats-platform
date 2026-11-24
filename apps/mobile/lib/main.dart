@@ -53,6 +53,33 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
   @override void initState() {
     super.initState();
     _jobDescription.addListener(() { if (mounted) setState(() {}); });
+    _restoreSavedCv();
+  }
+
+  // Reuse the signed-in candidate's latest private CV after navigation or
+  // page refresh. Without this, a valid existing CV leaves Analyze disabled.
+  Future<void> _restoreSavedCv() async {
+    if (!SupabaseConfig.configured ||
+        SupabaseConfig.client.auth.currentUser == null) return;
+    try {
+      final rows = await SupabaseConfig.client
+        .from('cvs')
+        .select('id,original_name')
+        .is('deleted_at', null)
+        .order('uploaded_at', ascending: false)
+        .limit(1);
+      if (!mounted || _uploadedCvId != null || rows.isEmpty) return;
+      final row = rows.first;
+      final id = row['id'];
+      if (id is! String || id.isEmpty) return;
+      setState(() {
+        _uploadedCvId = id;
+        _uploadedFile = (row['original_name'] as String?) ?? 'Saved CV';
+        _uploadFailed = false;
+      });
+    } catch (_) {
+      // Saved-CV lookup must not block a new upload.
+    }
   }
 
   Future<void> _pickCv() async {
@@ -254,9 +281,13 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
           label:Text(_submitting?'Submitting securely...':'Analyze my application'),
         )),
         const SizedBox(height:12),
-        Text(analysisEnabled
-          ?'Your request enters a secure queue. Results appear when processing finishes.'
-          :'This build has analysis disabled. Install the latest CV-ATS build to submit a job.',
+        Text(!analysisEnabled
+          ?'This build has analysis disabled. Install the latest CV-ATS build to submit a job.'
+          :_uploadedCvId==null
+            ?'Upload a CV first, or select a previously saved CV, to enable analysis.'
+            :_jobDescription.text.trim().length<20
+              ?'Paste at least 20 characters of job description to enable analysis.'
+              :'Your request enters a secure queue. Results appear when processing finishes.',
           textAlign:TextAlign.center,
           style:const TextStyle(color:AtsPalette.muted,fontSize:12,height:1.4)),
       ]),
