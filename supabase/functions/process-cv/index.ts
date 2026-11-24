@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
 import { evaluateV2, EXTRACTION_PROMPT, JOB_PROMPT } from "./scoring.ts";
 import { activeGeminiKeys, keyAtSlot } from "./gemini_key_rotation.ts";
-import { candidateModels, classifyGeminiHttp, finalGeminiError, canRetryTransientStatus, transientBackoffMs, expectedGeminiShape } from "./gemini_model_policy.ts";
+import { candidateModels, listedContentModels, classifyGeminiHttp, finalGeminiError, canRetryTransientStatus, transientBackoffMs, expectedGeminiShape } from "./gemini_model_policy.ts";
 
 // An authenticated one-job processor; not a replacement for an always-on
 // worker. Free Supabase Edge Functions have strict runtime limits.
@@ -70,6 +70,55 @@ function validMagic(bytes: Uint8Array, mime: string) {
 }
 // Select the Gemini credential independently of model choice.
 // A Postgres atomic counter guarantees rotation across Edge Function isolates.
+// Cache model metadata by the *numeric* key slot, never by secret value.
+// Models.list is an inventory check, not a guarantee of spare capacity.
+const modelInventoryCache = new Map<number, {
+  models: string[];
+  expires: number;
+}>();
+async function availableModelsForSlot(
+  apiKey: string, slot: number,
+): Promise<string[] | null> {
+  const cached = modelInventoryCache.get(slot);
+  if (cached && cached.expires > Date.now()) return cached.models;
+  const listings: unknown[] = [];
+  let token: string | undefined;
+  try {
+    for (let page = 0; page < 2; page++) {
+      const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
+      url.searchParams.set("pageSize", "100");
+      if (token) url.searchParams.set("pageToken", token);
+      const response = await fetch(url, {
+        headers: {"x-goog-api-key":apiKey},
+        signal: AbortSignal.timeout(4_000),
+      });
+      if (!response.ok) {
+        console.warn("Gemini model inventory unavailable", {
+          keySlot:slot, httpStatus:response.status,
+        });
+        return null; // Safe current-model fallback; never log a credential.
+      }
+      const data: unknown = await response.json();
+      if (!data || typeof data !== "object" ||
+          !Array.isArray((data as {models?: unknown}).models)) return null;
+      listings.push(...(data as {models: unknown[]}).models);
+      const next = (data as {nextPageToken?: unknown}).nextPageToken;
+      token = typeof next === "string" && next.length > 0 ? next : undefined;
+      if (!token) break;
+    }
+    const models = listedContentModels({models:listings});
+    modelInventoryCache.set(slot, {
+      models, expires:Date.now() + 5 * 60_000,
+    });
+    console.info("Gemini model inventory checked", {
+      keySlot:slot, compatibleModels:models.length,
+    });
+    return models;
+  } catch {
+    console.warn("Gemini model inventory request timed out", {keySlot:slot});
+    return null;
+  }
+}
 async function askGemini(
   admin: ReturnType<typeof createClient>,
   task: "ocr" | "job",
@@ -78,14 +127,12 @@ async function askGemini(
 ) {
   const preferred = Deno.env.get(task === "ocr"
     ? "GEMINI_MODEL_OCR" : "GEMINI_MODEL_ANALYSIS");
-  // Configured choices are attempted first, followed by supported Gemini 3
-  // model families. A Google project may not have access to legacy 2.5 models.
-  const models = candidateModels([
+  const configured = [
     preferred, Deno.env.get("GEMINI_MODEL_FALLBACK"),
     Deno.env.get("GEMINI_MODEL_TERTIARY"),
-  ]);
+  ];
   const keys = activeGeminiKeys((name) => Deno.env.get(name));
-  if (!keys.length || !models.length) throw new Error("gemini_not_configured");
+  if (!keys.length) throw new Error("gemini_not_configured");
 
   // Atomic allocation is global across Edge Function instances.
   // Never store or return the API key or request payload.
@@ -99,6 +146,12 @@ async function askGemini(
     throw new Error("gemini_dispatch_unavailable");
   }
   const apiKey = keyAtSlot(keys, allocated.data);
+  const inventory = await availableModelsForSlot(apiKey, allocated.data);
+  const models = candidateModels(configured, inventory, task);
+  if (models.length === 0) throw new Error("gemini_model_unavailable");
+  console.info("Gemini task starting", {
+    task, keySlot:allocated.data, modelCount:models.length,
+  });
   const providerStatuses: number[] = [];
   const deadline = Date.now() + 52_000;
   const pause = (ms: number) =>
@@ -136,7 +189,10 @@ async function askGemini(
         console.warn("Gemini network or timeout failure", {
           task, model, modelIndex, retry, keySlot:allocated.data,
         });
-        if (retry < 2 && deadline - Date.now() > 3_000) {
+        // When another model is available, switch promptly instead of
+        // exhausting the request budget retrying a congested endpoint.
+        if (modelIndex === models.length - 1 && retry < 1 &&
+            deadline - Date.now() > 4_000) {
           await pause(transientBackoffMs(retry, Math.random()));
           continue;
         }
@@ -154,8 +210,9 @@ async function askGemini(
         // Never rotate Gemini keys on rate limit: project quotas are shared.
         if (action === "rate_limited") throw new Error("rate_limited");
         if (action === "configuration") throw new Error("gemini_config_error");
-        if (canRetryTransientStatus(response.status) && retry < 2 &&
-            deadline - Date.now() > 3_000) {
+        if (canRetryTransientStatus(response.status) &&
+            modelIndex === models.length - 1 && retry < 1 &&
+            deadline - Date.now() > 4_000) {
           await pause(transientBackoffMs(retry, Math.random()));
           continue;
         }
