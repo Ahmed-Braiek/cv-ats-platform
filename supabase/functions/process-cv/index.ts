@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
 import { evaluateV2, EXTRACTION_PROMPT, JOB_PROMPT } from "./scoring.ts";
 import { activeGeminiKeys, keyAtSlot } from "./gemini_key_rotation.ts";
+import { candidateModels, classifyGeminiHttp, finalGeminiError } from "./gemini_model_policy.ts";
 
 // An authenticated one-job processor; not a replacement for an always-on
 // worker. Free Supabase Edge Functions have strict runtime limits.
@@ -77,10 +78,10 @@ async function askGemini(
 ) {
   const primary = Deno.env.get(task === "ocr"
     ? "GEMINI_MODEL_OCR" : "GEMINI_MODEL_ANALYSIS");
-  const models = [...new Set([
+  const models = candidateModels([
     primary, Deno.env.get("GEMINI_MODEL_FALLBACK"),
     Deno.env.get("GEMINI_MODEL_TERTIARY"),
-  ].filter((x): x is string => typeof x === "string" && x.length > 0))];
+  ]);
   const keys = activeGeminiKeys((name) => Deno.env.get(name));
   if (!keys.length || !models.length) throw new Error("gemini_not_configured");
 
@@ -96,29 +97,44 @@ async function askGemini(
   }
   const apiKey = keyAtSlot(keys, allocated.data);
 
+  const providerStatuses: number[] = [];
   for (let offset = 0; offset < models.length; offset++) {
     const model = models[offset];
     const urlGemini = "https://generativelanguage.googleapis.com/v1beta/models/" +
       encodeURIComponent(model) + ":generateContent";
-    const r = await fetch(urlGemini, {
-      method: "POST",
-      signal: AbortSignal.timeout(45_000),
-      headers: { "Content-Type": "application/json",
-        "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        systemInstruction: { parts: [{ text: instruction }] },
-        generationConfig: { responseMimeType: "application/json", temperature: 0 },
-      }),
-    });
-    if (!r.ok) {
-      // Google quotas are project-level. A 429 ends this request; do not
-      // switch models or API keys to work around rate limits.
-      if (r.status === 429) throw new Error("rate_limited");
-      if ([400,401,403].includes(r.status)) throw new Error("gemini_config_error");
-      // Transient provider 5xx: model fallback keeps the same allocated key.
-      if (r.status >= 500 && offset < models.length - 1) continue;
+    let r: Response;
+    try {
+      r = await fetch(urlGemini, {
+        method: "POST",
+        signal: AbortSignal.timeout(40_000),
+        headers: { "Content-Type": "application/json",
+          "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts }],
+          systemInstruction: { parts: [{ text: instruction }] },
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      });
+    } catch {
+      // A network or timeout error, never log CV content or credentials.
+      console.warn("Gemini provider network error", {task, attempt:offset + 1});
+      if (offset < models.length - 1) continue;
       throw new Error("gemini_unavailable");
+    }
+    if (!r.ok) {
+      providerStatuses.push(r.status);
+      // Log only status and attempt, never tokens, requests, CV text, or response body.
+      console.warn("Gemini provider rejected request", {
+        task, attempt:offset + 1, httpStatus:r.status,
+      });
+      const action = classifyGeminiHttp(r.status);
+      // Respect per-Google-project quota: no alternate key or model on 429.
+      if (action === "rate_limited") throw new Error("rate_limited");
+      if (action === "configuration") throw new Error("gemini_config_error");
+      // If an older model is unavailable (404), try the next configured
+      // model and finally Google's supported document fallback. Same key.
+      if (action === "next_model" && offset < models.length - 1) continue;
+      throw new Error(finalGeminiError(providerStatuses));
     }
     const payload = await r.json();
     const raw = payload?.candidates?.[0]?.content?.parts
@@ -201,9 +217,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return response(req,405,{error:"method_not_allowed"});
   if (!url || !publicKey || !secret)
     return response(req,503,{error:"backend_not_configured"});
-  if (!activeGeminiKeys((name) => Deno.env.get(name)).length ||
-      !Deno.env.get("GEMINI_MODEL_OCR") ||
-      !Deno.env.get("GEMINI_MODEL_ANALYSIS"))
+  // The supported document model is the default even when old model
+  // environment variables are missing or no longer available to the key.
+  if (!activeGeminiKeys((name) => Deno.env.get(name)).length)
     return response(req,503,{error:"gemini_not_configured"});
   const bearer = req.headers.get("authorization") ?? "";
   if (!bearer.startsWith("Bearer ") || bearer.length < 25)
