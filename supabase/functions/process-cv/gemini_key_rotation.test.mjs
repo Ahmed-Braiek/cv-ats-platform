@@ -30,3 +30,24 @@ test('invalid cursor values fail closed', () => {
       /gemini_dispatch_unavailable/);
   }
 });
+
+import {candidateModels, classifyGeminiHttp, finalGeminiError, SAFE_DOCUMENT_MODEL}
+  from './gemini_model_policy.ts';
+
+test('legacy model IDs get a supported document fallback without duplicates', () => {
+  assert.deepEqual(candidateModels(['models/gemini-2.5-flash', 'gemini-2.5-flash']),
+    ['gemini-2.5-flash', SAFE_DOCUMENT_MODEL]);
+  assert.deepEqual(candidateModels([null, '', SAFE_DOCUMENT_MODEL]), [SAFE_DOCUMENT_MODEL]);
+});
+
+test('404 and transient errors try another model but not another API key', () => {
+  assert.equal(classifyGeminiHttp(404), 'next_model');
+  assert.equal(classifyGeminiHttp(503), 'next_model');
+  assert.equal(classifyGeminiHttp(408), 'next_model');
+  assert.equal(classifyGeminiHttp(429), 'rate_limited');
+  assert.equal(classifyGeminiHttp(400), 'configuration');
+  assert.equal(classifyGeminiHttp(403), 'configuration');
+  assert.equal(classifyGeminiHttp(402), 'configuration');
+  assert.equal(finalGeminiError([404, 404]), 'gemini_model_unavailable');
+  assert.equal(finalGeminiError([404, 503]), 'gemini_unavailable');
+});
