@@ -86,25 +86,49 @@ export class AppController {
     if (cvError || !cv) {
       throw new HttpException('CV not found', HttpStatus.NOT_FOUND);
     }
-    const { data: job, error: jobError } = await client
-      .from('job_descriptions').insert({
-        user_id: user.id,
-        title: dto.jobTitle?.trim() || null,
-        raw_text: dto.jobDescription.trim(),
-      }).select('id').single();
-    if (jobError || !job) {
-      throw new HttpException('Unable to create job description', HttpStatus.BAD_REQUEST);
+    // Single RLS-protected database transaction: if a quota check rejects
+    // the analysis, the new job description is rolled back automatically.
+    const { data: rows, error } = await client.rpc('cv_ats_submit_analysis', {
+      p_cv_id: dto.cvId,
+      p_job_description: dto.jobDescription.trim(),
+      p_job_title: dto.jobTitle?.trim() || null,
+    });
+
+    if (error) {
+      const reason = error.message.toLowerCase();
+      if (reason.includes('monthly analysis quota exceeded')) {
+        throw new HttpException({
+          code: 'MONTHLY_ANALYSIS_LIMIT',
+          message: 'Monthly analysis limit reached for your plan. Your quota resets next month, or you can request an upgrade.',
+        }, HttpStatus.TOO_MANY_REQUESTS);
+      }
+      if (reason.includes('too many outstanding analyses')) {
+        throw new HttpException({
+          code: 'ANALYSIS_QUEUE_FULL',
+          message: 'Two analyses are already processing. Please wait for one to finish.',
+        }, HttpStatus.CONFLICT);
+      }
+      if (reason.includes('no active subscription')) {
+        throw new HttpException({
+          code: 'SUBSCRIPTION_INACTIVE',
+          message: 'No active analysis plan found. Check your subscription.',
+        }, HttpStatus.FORBIDDEN);
+      }
+      if (reason.includes('cv_not_found')) {
+        throw new HttpException('CV not found', HttpStatus.NOT_FOUND);
+      }
+      if (reason.includes('job_description_length_invalid') ||
+          reason.includes('job_title_length_invalid')) {
+        throw new HttpException('Invalid job details', HttpStatus.BAD_REQUEST);
+      }
+      // Do not leak database errors, CV content or internal policy details.
+      throw new HttpException('Unable to create analysis. Please try again later.',
+        HttpStatus.BAD_GATEWAY);
     }
-    const { data: analysis, error } = await client.from('analyses')
-      .insert({
-        user_id: user.id,
-        cv_id: dto.cvId,
-        job_description_id: job.id,
-        status: 'queued',
-      }).select('id,status,created_at').single();
-    if (error || !analysis) {
-      throw new HttpException('Analysis could not be queued (quota or input validation)',
-        HttpStatus.BAD_REQUEST);
+
+    const analysis = Array.isArray(rows) ? rows[0] : null;
+    if (!analysis?.id) {
+      throw new HttpException('Analysis was not created', HttpStatus.BAD_GATEWAY);
     }
     return { data: analysis };
   }
