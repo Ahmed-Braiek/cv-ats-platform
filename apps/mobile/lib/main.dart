@@ -65,7 +65,7 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
       final rows = await SupabaseConfig.client
         .from('cvs')
         .select('id,original_name')
-        .is('deleted_at', null)
+        .isFilter('deleted_at', null)
         .order('uploaded_at', ascending: false)
         .limit(1);
       if (!mounted || _uploadedCvId != null || rows.isEmpty) return;
