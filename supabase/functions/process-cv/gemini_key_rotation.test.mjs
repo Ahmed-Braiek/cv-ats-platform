@@ -31,13 +31,15 @@ test('invalid cursor values fail closed', () => {
   }
 });
 
-import {candidateModels, classifyGeminiHttp, finalGeminiError, SAFE_DOCUMENT_MODEL}
-  from './gemini_model_policy.ts';
+import {candidateModels, classifyGeminiHttp, finalGeminiError, SAFE_DOCUMENT_MODEL,
+  SUPPORTED_DOCUMENT_FALLBACKS, canRetryTransientStatus, transientBackoffMs,
+  expectedGeminiShape} from './gemini_model_policy.ts';
 
 test('legacy model IDs get a supported document fallback without duplicates', () => {
   assert.deepEqual(candidateModels(['models/gemini-2.5-flash', 'gemini-2.5-flash']),
-    ['gemini-2.5-flash', SAFE_DOCUMENT_MODEL]);
-  assert.deepEqual(candidateModels([null, '', SAFE_DOCUMENT_MODEL]), [SAFE_DOCUMENT_MODEL]);
+    ['gemini-2.5-flash', ...SUPPORTED_DOCUMENT_FALLBACKS]);
+  assert.deepEqual(candidateModels([null, '', SAFE_DOCUMENT_MODEL]),
+    [...SUPPORTED_DOCUMENT_FALLBACKS]);
 });
 
 test('404 and transient errors try another model but not another API key', () => {
@@ -50,4 +52,26 @@ test('404 and transient errors try another model but not another API key', () =>
   assert.equal(classifyGeminiHttp(402), 'configuration');
   assert.equal(finalGeminiError([404, 404]), 'gemini_model_unavailable');
   assert.equal(finalGeminiError([404, 503]), 'gemini_unavailable');
+});
+
+test('transient status retry is bounded and never retries credentials or quota', () => {
+  assert.equal(canRetryTransientStatus(503), true);
+  assert.equal(canRetryTransientStatus(502), true);
+  assert.equal(canRetryTransientStatus(408), true);
+  for (const status of [400, 401, 403, 404, 429]) {
+    assert.equal(canRetryTransientStatus(status), false);
+  }
+  assert.equal(transientBackoffMs(0, 0), 800);
+  assert.equal(transientBackoffMs(1, 0), 1600);
+  assert.equal(transientBackoffMs(1, 1), 2000);
+});
+
+test('model schema failures never count as valid vacancy analysis', () => {
+  assert.equal(expectedGeminiShape('job', {requirements:[]}), true);
+  assert.equal(expectedGeminiShape('job', {message:'Hello'}), false);
+  assert.equal(expectedGeminiShape('job', []), false);
+  const cv = {candidate:{skills:[],experience:[],education:[]},
+    document:{raw_text:'real document'}, sections:{}};
+  assert.equal(expectedGeminiShape('ocr',cv),true);
+  assert.equal(expectedGeminiShape('ocr',{candidate:{},document:{}}),false);
 });
