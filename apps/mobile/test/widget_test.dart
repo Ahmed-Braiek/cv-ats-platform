@@ -72,6 +72,26 @@ void main() {
     expect(disabled, findsWidgets);
   });
 
+  testWidgets('CV upload remains usable on a narrow mobile viewport',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(
+      theme: AtsTheme.light(),
+      home: const NewAnalysisScreen(),
+    ));
+    expect(find.text('Analyze your application'), findsOneWidget);
+    expect(find.text('Choose your CV to get started'), findsOneWidget);
+    await tester.ensureVisible(find.text('Analyze my application'));
+    await tester.pump();
+    expect(find.text('Analyze my application'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('evidence report explains scores and provides requirement filters',
       (tester) async {
     final report = <String, dynamic>{

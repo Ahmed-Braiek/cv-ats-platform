@@ -32,6 +32,7 @@ class _CandidateShellState extends State<CandidateShell> {
       const AccountPage(),
     ];
     const labels = ['Overview', 'Analyze', 'History', 'My CVs', 'Account'];
+    const compactLabels = ['Home', 'Analyze', 'History', 'CVs', 'Account'];
     const icons = [
       Icons.space_dashboard_outlined, Icons.auto_awesome_outlined,
       Icons.history_outlined, Icons.description_outlined,
@@ -62,15 +63,19 @@ class _CandidateShellState extends State<CandidateShell> {
           ),
           Expanded(child: IndexedStack(index: _tab, children: pages)),
         ]),
-        bottomNavigationBar: wide ? null : NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: (value) => setState(() => _tab = value),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: List.generate(labels.length, (i) =>
-            NavigationDestination(
-              icon: Icon(icons[i]), selectedIcon: Icon(selected[i]),
-              label: labels[i],
-            )),
+        bottomNavigationBar: wide ? null : SafeArea(
+          top: false,
+          child: NavigationBar(
+            selectedIndex: _tab,
+            onDestinationSelected: (value) => setState(() => _tab = value),
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+            destinations: List.generate(compactLabels.length, (i) =>
+              NavigationDestination(
+                tooltip: labels[i],
+                icon: Icon(icons[i]), selectedIcon: Icon(selected[i]),
+                label: compactLabels[i],
+              )),
+          ),
         ),
       );
     });
@@ -122,8 +127,9 @@ class _DashboardPageState extends State<DashboardPage> {
       Text('Welcome back, $name',style:Theme.of(context).textTheme.headlineMedium
         ?.copyWith(fontWeight:FontWeight.w900)),
       const SizedBox(height:8),
-      const Text('Your progress, clearer with every application.',
-        style:TextStyle(color:AtsPalette.muted)),
+      Text('Your progress, clearer with every application.',
+        style:TextStyle(color:Theme.of(context).colorScheme.onSurface
+          .withValues(alpha:.68))),
       const SizedBox(height:23),
       Container(
         width:double.infinity,
@@ -233,17 +239,17 @@ class AnalysisHistoryPage extends StatefulWidget {
 class _AnalysisHistoryPageState extends State<AnalysisHistoryPage> {
   String filter='all';
   late Future<List<Map<String,dynamic>>> _history;
-  @override void initState(){super.initState();_history=_myRows(
-    'analyses','id,status,created_at,completed_at','created_at');}
+  @override void initState(){super.initState();_reload();}
+  void _reload()=>_history=_myRows(
+    'analyses','id,status,created_at,completed_at','created_at');
   @override Widget build(BuildContext context)=>AtsPage(
     title:'Analysis history',
-    actions:[IconButton(tooltip:'Refresh',onPressed:()=>setState(()=>
-      _history=_myRows('analyses','id,status,created_at,completed_at','created_at')),
-      icon:const Icon(Icons.refresh))],
+    actions:[IconButton(tooltip:'Refresh history',
+      onPressed:()=>setState(_reload),icon:const Icon(Icons.refresh_rounded))],
     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const AtsHeader(title:'Your analysis history',
         subtitle:'Every assessment stays connected to your account.'),
-      Wrap(spacing:8,children:[
+      Wrap(spacing:8,runSpacing:8,children:[
         for(final item in ['all','completed','in progress','failed'])
           ChoiceChip(
             label:Text(item=='all'?'All':item=='in progress'?'In progress':
@@ -255,8 +261,12 @@ class _AnalysisHistoryPageState extends State<AnalysisHistoryPage> {
       const SizedBox(height:18),
       FutureBuilder<List<Map<String,dynamic>>>(future:_history,builder:(context,s){
         if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:3,heading:false);
-        if(s.hasError)return const AtsEmptyState(icon:Icons.error_outline,
-          title:'History unavailable',description:'Please retry when you are online.');
+        if(s.hasError)return AtsEmptyState(icon:Icons.wifi_off_rounded,
+          title:'History unavailable',
+          description:'Your saved analyses are still in your account. '
+            'Check the connection and try loading them again.',
+          action:FilledButton.icon(onPressed:()=>setState(_reload),
+            icon:const Icon(Icons.refresh_rounded),label:const Text('Retry history')));
         final rows=(s.data ?? []).where((r){
           final status=r['status'] as String? ?? 'queued';
           if(filter=='all')return true;
@@ -264,12 +274,25 @@ class _AnalysisHistoryPageState extends State<AnalysisHistoryPage> {
             .contains(status);
           return status==filter;
         }).toList();
-        if(rows.isEmpty)return const AtsEmptyState(
-          icon:Icons.history_rounded,title:'Nothing here yet',
-          description:'Analyses matching this filter will appear here.');
-        return Column(children:rows.map((r)=>Padding(
-          padding:const EdgeInsets.only(bottom:12),
-          child:_AnalysisTile(row:r))).toList());
+        if(rows.isEmpty)return AtsEmptyState(
+          icon:Icons.history_rounded,title:filter=='all'?
+            'Your analysis history is empty':'No matching analyses',
+          description:filter=='all'?
+            'Start a CV analysis to see your applications and results here.':
+            'Try another status filter to view your saved analyses.',
+          action:filter=='all'?null:TextButton.icon(
+            onPressed:()=>setState(()=>filter='all'),
+            icon:const Icon(Icons.filter_alt_off_outlined),
+            label:const Text('Show all analyses')));
+        return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('${rows.length} ${rows.length==1?'analysis':'analyses'}',
+            style:TextStyle(fontSize:12,fontWeight:FontWeight.w700,
+              color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.68))),
+          const SizedBox(height:12),
+          ...rows.map((r)=>Padding(
+            padding:const EdgeInsets.only(bottom:12),
+            child:_AnalysisTile(row:r))),
+        ]);
       }),
     ]));
 }
@@ -334,20 +357,31 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
         subtitle:'Your documents are stored in a private, access-controlled bucket.'),
       FutureBuilder<List<Map<String,dynamic>>>(future:_documents,builder:(context,s){
         if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:3,heading:false);
-        if(s.hasError)return const AtsEmptyState(icon:Icons.lock_outline,
+        if(s.hasError)return AtsEmptyState(icon:Icons.wifi_off_rounded,
           title:'Unable to load documents',
-          description:'Check your authentication and internet connection.');
+          description:'Your private CVs are still protected. Check your '
+            'connection and retry loading the library.',
+          action:FilledButton.icon(onPressed:()=>setState(_load),
+            icon:const Icon(Icons.refresh_rounded),label:const Text('Retry library')));
         final items=s.data ?? [];
-        if(items.isEmpty)return const AtsEmptyState(icon:Icons.folder_open_outlined,
-          title:'No CVs uploaded',description:'Upload a CV from the Analyze tab to start your library.');
-        return Column(children:[
+        if(items.isEmpty)return const AtsEmptyState(
+          icon:Icons.folder_open_outlined,
+          title:'No CVs uploaded',
+          description:'Go to Analyze to upload your first document. '
+            'Your CVs will appear here after they are stored securely.');
+        return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('${items.length} ${items.length==1?'private document':'private documents'}',
+            style:TextStyle(fontSize:12,fontWeight:FontWeight.w700,
+              color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.68))),
+          const SizedBox(height:12),
           for(final file in items) Padding(
             padding:const EdgeInsets.only(bottom:12),
             child:AtsPanel(onTap:()=>showModalBottomSheet<void>(
               context:context,showDragHandle:true,
               builder:(ctx)=>SafeArea(child:Padding(
                 padding:const EdgeInsets.all(24),
-                child:Column(mainAxisSize:MainAxisSize.min,
+                child:SingleChildScrollView(child:Column(
+                  mainAxisSize:MainAxisSize.min,
                   crossAxisAlignment:CrossAxisAlignment.start,children:[
                   const AtsEyebrow('PRIVATE DOCUMENT'),
                   const SizedBox(height:10),
@@ -375,7 +409,7 @@ class _CvLibraryPageState extends State<CvLibraryPage> {
                   const SizedBox(height:7),
                   Center(child:TextButton(onPressed:()=>Navigator.pop(ctx),
                     child:const Text('Close'))),
-                ]),
+                ])),
               ))),
             child:Row(children:[
               const Icon(Icons.description_outlined,color:AtsPalette.brand),
@@ -445,8 +479,10 @@ class AccountPage extends StatelessWidget {
             ? (user.userMetadata!['display_name'] as String) : 'Candidate',
             style:Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight:FontWeight.w900)),
           const SizedBox(height:5),
-          Text(user.email??'No email address',
-            style:const TextStyle(color:AtsPalette.muted,fontSize:12)),
+          Text(user.email??'No email address',maxLines:2,
+            overflow:TextOverflow.ellipsis,
+            style:TextStyle(color:Theme.of(context).colorScheme.onSurface
+              .withValues(alpha:.68),fontSize:12)),
         ])),
         IconButton(
           tooltip:'Edit your display name',
@@ -466,6 +502,11 @@ class AccountPage extends StatelessWidget {
           ).eq('user_id',user.id).eq('status','active').maybeSingle(),
           builder:(context,s){
             if(!s.hasData&&!s.hasError)return const AtsSkeleton(width:210,height:26);
+            if(s.hasError)return const AtsInfoStrip(
+              icon:Icons.wifi_off_rounded,
+              message:'Your membership details are temporarily unavailable. '
+                'Your account is unchanged. Please try again later.',
+              warning:true);
             final row=s.data is Map?Map<String,dynamic>.from(s.data as Map):<String,dynamic>{};
             final detail=row['subscription_plans'] is Map
               ?Map<String,dynamic>.from(row['subscription_plans'] as Map)
@@ -528,7 +569,7 @@ class AccountPage extends StatelessWidget {
         },
         icon:const Icon(Icons.logout_rounded),label:const Text('Sign out')),
       const SizedBox(height:22),
-      const Center(child:Text('CV ATS · Android first · v0.1',
+      const Center(child:Text('CV ATS · Career Studio',
         style:TextStyle(color:AtsPalette.muted,fontSize:11))),
     ]));
   }
@@ -547,7 +588,8 @@ class SubscriptionPlansPage extends StatelessWidget {
         builder:(context,s){
           if(!s.hasData && !s.hasError)return const AtsLoadingCards(count:2,heading:false);
           if(s.hasError)return const AtsEmptyState(icon:Icons.cloud_off,
-            title:'Plans unavailable',description:'Try again when the network is available.');
+            title:'Plans unavailable',description:'Your plan has not changed. '
+              'Please try again when the connection is restored.');
           final rows=(s.data as List? ?? []);
           return Column(children:[
             for(final data in rows)Padding(

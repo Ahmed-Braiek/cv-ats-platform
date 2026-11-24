@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 /// Shared product tokens. Flutter is the source of truth for mobile styling.
@@ -53,6 +54,10 @@ class AtsTheme {
       scaffoldBackgroundColor: background,
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.standard,
+      dividerTheme: DividerThemeData(
+        color: colors.onSurface.withValues(alpha: .10),
+        thickness: 1,
+      ),
       textTheme: TextTheme(
         headlineMedium: TextStyle(fontSize: 27, height: 1.17,
           fontWeight: FontWeight.w900,letterSpacing: -.75,color:colors.onSurface),
@@ -117,6 +122,14 @@ class AtsTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         ),
       ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: colors.surface,
+        indicatorColor: colors.primary.withValues(alpha: .13),
+        selectedIconTheme: IconThemeData(color: colors.primary, size: 23),
+        selectedLabelTextStyle: TextStyle(
+          color: colors.primary, fontWeight: FontWeight.w800,
+        ),
+      ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colors.surface,
         indicatorColor: colors.primary.withValues(alpha: .13),
@@ -135,6 +148,9 @@ class AtsTheme {
         backgroundColor: colors.onSurface,
         contentTextStyle: TextStyle(color: colors.surface),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
     );
   }
@@ -156,6 +172,7 @@ class AtsPanel extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
         child: Container(
           width: double.infinity,
           padding: padding ?? const EdgeInsets.all(20),
@@ -243,11 +260,21 @@ class AtsEmptyState extends StatelessWidget {
             fontWeight: FontWeight.w800,
           )),
         const SizedBox(height: 7),
-        Text(description, textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .65),
-          )),
-        if (action != null) ...[const SizedBox(height: 20), action!],
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Text(description, textAlign: TextAlign.center,
+            style: TextStyle(
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .70),
+            )),
+        ),
+        if (action != null) ...[
+          const SizedBox(height: 20),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: action!,
+          ),
+        ],
       ]),
     ),
   );
@@ -328,14 +355,17 @@ class AtsPage extends StatelessWidget {
   final List<Widget>? actions;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title), actions: actions),
+    appBar: AppBar(
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      actions: actions,
+    ),
     body: SafeArea(child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 850),
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         padding: EdgeInsets.fromLTRB(
-          MediaQuery.sizeOf(context).width < 480 ? 16 : 22,
-          18,MediaQuery.sizeOf(context).width < 480 ? 16 : 22,35),
+          MediaQuery.sizeOf(context).width < 480 ? 16 : 24,
+          20,MediaQuery.sizeOf(context).width < 480 ? 16 : 24,40),
         child: child,
       ),
     ))),

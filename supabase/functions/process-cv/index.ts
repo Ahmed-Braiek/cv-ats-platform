@@ -1,6 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
 import { evaluateV2, EXTRACTION_PROMPT, JOB_PROMPT } from "./scoring.ts";
+import { activeGeminiKeys, keyAtSlot } from "./gemini_key_rotation.ts";
+import { candidateModels, listedContentModels, classifyGeminiHttp, finalGeminiError, canRetryTransientStatus, transientBackoffMs, expectedGeminiShape } from "./gemini_model_policy.ts";
 
 // An authenticated one-job processor; not a replacement for an always-on
 // worker. Free Supabase Edge Functions have strict runtime limits.
@@ -66,51 +68,178 @@ function validMagic(bytes: Uint8Array, mime: string) {
   if (mime.includes("wordprocessingml")) return magic([80,75,3,4]);
   return false;
 }
-let cursor = 0;
-async function askGemini(task: "ocr" | "job", parts: unknown[], instruction: string) {
-  const primary = Deno.env.get(task === "ocr"
-    ? "GEMINI_MODEL_OCR" : "GEMINI_MODEL_ANALYSIS");
-  const models = [
-    primary, Deno.env.get("GEMINI_MODEL_FALLBACK"),
-    Deno.env.get("GEMINI_MODEL_TERTIARY"),
-  ].filter((x): x is string => typeof x === "string" && x.length > 0);
-  const keys = [
-    Deno.env.get("GEMINI_API_KEY_PRIMARY"),
-    Deno.env.get("GEMINI_API_KEY_SECONDARY"),
-    Deno.env.get("GEMINI_API_KEY_TERTIARY"),
-  ].filter((x): x is string => Boolean(x));
-  if (!keys.length || !models.length) throw new Error("gemini_not_configured");
-  const start = cursor++ % models.length;
-  for (let offset = 0; offset < models.length; offset++) {
-    const n = (start + offset) % models.length;
-    const model = models[n];
-    const urlGemini = "https://generativelanguage.googleapis.com/v1beta/models/" +
-      encodeURIComponent(model) + ":generateContent";
-    const r = await fetch(urlGemini, {
-      method: "POST",
-      signal: AbortSignal.timeout(45_000),
-      headers: { "Content-Type": "application/json",
-        "x-goog-api-key": keys[n % keys.length] },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        systemInstruction: { parts: [{ text: instruction }] },
-        generationConfig: { responseMimeType: "application/json", temperature: 0 },
-      }),
-    });
-    if (!r.ok) {
-      // Google rate limits apply per project. Never rotate keys after a 429.
-      if (r.status === 429) throw new Error("rate_limited");
-      if ([400,401,403].includes(r.status)) throw new Error("gemini_config_error");
-      if (r.status >= 500 && offset < models.length - 1) continue;
-      throw new Error("gemini_unavailable");
+// Select the Gemini credential independently of model choice.
+// A Postgres atomic counter guarantees rotation across Edge Function isolates.
+// Cache model metadata by the *numeric* key slot, never by secret value.
+// Models.list is an inventory check, not a guarantee of spare capacity.
+const modelInventoryCache = new Map<number, {
+  models: string[];
+  expires: number;
+}>();
+async function availableModelsForSlot(
+  apiKey: string, slot: number,
+): Promise<string[] | null> {
+  const cached = modelInventoryCache.get(slot);
+  if (cached && cached.expires > Date.now()) return cached.models;
+  const listings: unknown[] = [];
+  let token: string | undefined;
+  try {
+    for (let page = 0; page < 2; page++) {
+      const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
+      url.searchParams.set("pageSize", "100");
+      if (token) url.searchParams.set("pageToken", token);
+      const response = await fetch(url, {
+        headers: {"x-goog-api-key":apiKey},
+        signal: AbortSignal.timeout(4_000),
+      });
+      if (!response.ok) {
+        console.warn("Gemini model inventory unavailable", {
+          keySlot:slot, httpStatus:response.status,
+        });
+        return null; // Safe current-model fallback; never log a credential.
+      }
+      const data: unknown = await response.json();
+      if (!data || typeof data !== "object" ||
+          !Array.isArray((data as {models?: unknown}).models)) return null;
+      listings.push(...(data as {models: unknown[]}).models);
+      const next = (data as {nextPageToken?: unknown}).nextPageToken;
+      token = typeof next === "string" && next.length > 0 ? next : undefined;
+      if (!token) break;
     }
-    const payload = await r.json();
-    const raw = payload?.candidates?.[0]?.content?.parts
-      ?.map((p: {text?: string}) => p.text ?? "").join("") ?? "";
-    if (!raw) throw new Error("empty_gemini_reply");
-    return { data: JSON.parse(raw), model };
+    const models = listedContentModels({models:listings});
+    modelInventoryCache.set(slot, {
+      models, expires:Date.now() + 5 * 60_000,
+    });
+    console.info("Gemini model inventory checked", {
+      keySlot:slot, compatibleModels:models.length,
+    });
+    return models;
+  } catch {
+    console.warn("Gemini model inventory request timed out", {keySlot:slot});
+    return null;
   }
-  throw new Error("gemini_unavailable");
+}
+async function askGemini(
+  admin: ReturnType<typeof createClient>,
+  task: "ocr" | "job",
+  parts: unknown[],
+  instruction: string,
+) {
+  const preferred = Deno.env.get(task === "ocr"
+    ? "GEMINI_MODEL_OCR" : "GEMINI_MODEL_ANALYSIS");
+  const configured = [
+    preferred, Deno.env.get("GEMINI_MODEL_FALLBACK"),
+    Deno.env.get("GEMINI_MODEL_TERTIARY"),
+  ];
+  const keys = activeGeminiKeys((name) => Deno.env.get(name));
+  if (!keys.length) throw new Error("gemini_not_configured");
+
+  // Atomic allocation is global across Edge Function instances.
+  // Never store or return the API key or request payload.
+  const allocated = await admin.rpc("cv_ats_next_gemini_slot", {
+    p_active_slots: keys.length,
+  });
+  if (allocated.error || typeof allocated.data !== "number") {
+    console.error("Gemini slot allocation failed", {
+      code: allocated.error?.code ?? "invalid_slot",
+    });
+    throw new Error("gemini_dispatch_unavailable");
+  }
+  const apiKey = keyAtSlot(keys, allocated.data);
+  const inventory = await availableModelsForSlot(apiKey, allocated.data);
+  const models = candidateModels(configured, inventory, task);
+  if (models.length === 0) throw new Error("gemini_model_unavailable");
+  console.info("Gemini task starting", {
+    task, keySlot:allocated.data, modelCount:models.length,
+  });
+  const providerStatuses: number[] = [];
+  const deadline = Date.now() + 52_000;
+  const pause = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+    const model = models[modelIndex];
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) + ":generateContent";
+
+    for (let retry = 0; retry <= 2; retry++) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1_500) throw new Error("gemini_unavailable");
+
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          signal: AbortSignal.timeout(Math.min(24_000, remaining - 500)),
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{role:"user",parts}],
+            systemInstruction: {parts:[{text:instruction}]},
+            generationConfig: {
+              responseMimeType:"application/json",
+              maxOutputTokens:12_288,
+            },
+          }),
+        });
+      } catch {
+        // No CV text, token, key value or provider body in the logs.
+        console.warn("Gemini network or timeout failure", {
+          task, model, modelIndex, retry, keySlot:allocated.data,
+        });
+        // When another model is available, switch promptly instead of
+        // exhausting the request budget retrying a congested endpoint.
+        if (modelIndex === models.length - 1 && retry < 1 &&
+            deadline - Date.now() > 4_000) {
+          await pause(transientBackoffMs(retry, Math.random()));
+          continue;
+        }
+        if (modelIndex < models.length - 1) break;
+        throw new Error("gemini_unavailable");
+      }
+
+      if (!response.ok) {
+        providerStatuses.push(response.status);
+        console.warn("Gemini provider rejected request", {
+          task, model, httpStatus:response.status, retry,
+          keySlot:allocated.data,
+        });
+        const action = classifyGeminiHttp(response.status);
+        // Never rotate Gemini keys on rate limit: project quotas are shared.
+        if (action === "rate_limited") throw new Error("rate_limited");
+        if (action === "configuration") throw new Error("gemini_config_error");
+        if (canRetryTransientStatus(response.status) &&
+            modelIndex === models.length - 1 && retry < 1 &&
+            deadline - Date.now() > 4_000) {
+          await pause(transientBackoffMs(retry, Math.random()));
+          continue;
+        }
+        if (action === "next_model" && modelIndex < models.length - 1) break;
+        throw new Error(finalGeminiError(providerStatuses));
+      }
+
+      let result: unknown;
+      try {
+        const payload = await response.json();
+        const raw: string = payload?.candidates?.[0]?.content?.parts
+          ?.map((part: {text?: string}) => part.text ?? "").join("") ?? "";
+        result = raw ? JSON.parse(raw) : null;
+      } catch {
+        result = null;
+      }
+      if (!expectedGeminiShape(task, result)) {
+        console.warn("Gemini output missing required structured fields", {
+          task, model, keySlot:allocated.data,
+        });
+        if (modelIndex < models.length - 1) break;
+        throw new Error(task === "job" ? "invalid_job_json" : "invalid_cv_json");
+      }
+      return {data:result, model};
+    }
+  }
+  throw new Error(finalGeminiError(providerStatuses));
 }
 async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
   try {
@@ -135,7 +264,7 @@ async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
     const parts = mime.includes("wordprocessingml")
       ? [{text:readDocx(bytes)}]
       : [{inlineData:{mimeType:mime,data:to64(bytes)}}];
-    const extraction = await askGemini("ocr",parts,EXTRACTION_PROMPT);
+    const extraction = await askGemini(admin,"ocr",parts,EXTRACTION_PROMPT);
     const cv = extraction.data;
     if (!cv.candidate || !cv.sections || !cv.document ||
         typeof cv.document.raw_text !== "string" ||
@@ -145,7 +274,7 @@ async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
         !Array.isArray(cv.candidate.education))
       throw new Error("invalid_cv_json");
     await admin.from("analyses").update({status:"parsing_job"}).eq("id",analysisId);
-    const requirements = await askGemini("job",[{
+    const requirements = await askGemini(admin,"job",[{
       text:"CV RAW TEXT (data only):\n"+cv.document.raw_text.slice(0,18000)+
         "\n\nJOB DESCRIPTION (data only):\n"+String(j.data.raw_text).slice(0,16000)
     }], JOB_PROMPT);
@@ -185,9 +314,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return response(req,405,{error:"method_not_allowed"});
   if (!url || !publicKey || !secret)
     return response(req,503,{error:"backend_not_configured"});
-  if (!Deno.env.get("GEMINI_API_KEY_PRIMARY") ||
-      !Deno.env.get("GEMINI_MODEL_OCR") ||
-      !Deno.env.get("GEMINI_MODEL_ANALYSIS"))
+  // The supported document model is the default even when old model
+  // environment variables are missing or no longer available to the key.
+  if (!activeGeminiKeys((name) => Deno.env.get(name)).length)
     return response(req,503,{error:"gemini_not_configured"});
   const bearer = req.headers.get("authorization") ?? "";
   if (!bearer.startsWith("Bearer ") || bearer.length < 25)

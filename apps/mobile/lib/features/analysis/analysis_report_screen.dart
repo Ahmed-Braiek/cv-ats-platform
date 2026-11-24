@@ -28,7 +28,8 @@ class AnalysisReportScreen extends StatelessWidget{
       ]),
       body:SafeArea(child:Column(children:[
         const TabBar(isScrollable:true,tabAlignment:TabAlignment.start,
-          dividerHeight:0,tabs:[
+          dividerHeight:0,labelPadding:EdgeInsets.symmetric(horizontal:18),
+          tabs:[
             Tab(text:'Overview'),Tab(text:'CV readiness'),
             Tab(text:'Job match'),Tab(text:'Next steps'),
           ]),
@@ -120,7 +121,9 @@ class _Scroll extends StatelessWidget{
   final List<Widget> children;
   @override Widget build(BuildContext context)=>Center(child:ConstrainedBox(
     constraints:const BoxConstraints(maxWidth:760),
-    child:ListView(padding:const EdgeInsets.fromLTRB(18,21,18,34),
+    child:ListView(padding:EdgeInsets.fromLTRB(
+      MediaQuery.sizeOf(context).width<480?16:24,22,
+      MediaQuery.sizeOf(context).width<480?16:24,40),
       children:children)));
 }
 class _Pill extends StatelessWidget{
@@ -211,7 +214,9 @@ class _ScoreTile extends StatelessWidget{
       Text('$value/100',style:Theme.of(context).textTheme.titleLarge
         ?.copyWith(fontWeight:FontWeight.w900)),
       const SizedBox(height:6),
-      Text(title,style:const TextStyle(color:AtsPalette.muted,fontSize:11)),
+      Text(title,style:TextStyle(
+        color:Theme.of(context).colorScheme.onSurface.withValues(alpha:.70),
+        fontSize:12,height:1.4)),
       const SizedBox(height:10),
       ClipRRect(borderRadius:BorderRadius.circular(9),
         child:LinearProgressIndicator(value:value/100,minHeight:5,

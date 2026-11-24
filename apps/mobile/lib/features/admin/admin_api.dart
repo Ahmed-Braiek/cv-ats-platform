@@ -26,7 +26,7 @@ class AdminApi {
       if (status == 401 || status == 403) {
         throw StateError('Administrator access required. Sign in with an approved admin account.');
       }
-      throw StateError('Admin request failed (${status ?? 'network'}). Please retry.');
+      throw StateError('Admin request failed (${status}). Please retry.');
     }
   }
 
