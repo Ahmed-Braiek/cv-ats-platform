@@ -32,14 +32,18 @@ test('invalid cursor values fail closed', () => {
 });
 
 import {candidateModels, classifyGeminiHttp, finalGeminiError, SAFE_DOCUMENT_MODEL,
-  SUPPORTED_DOCUMENT_FALLBACKS, canRetryTransientStatus, transientBackoffMs,
+  SUPPORTED_DOCUMENT_FALLBACKS, listedContentModels, textGenerationModel,
+  canRetryTransientStatus, transientBackoffMs,
   expectedGeminiShape} from './gemini_model_policy.ts';
 
 test('legacy model IDs get a supported document fallback without duplicates', () => {
   assert.deepEqual(candidateModels(['models/gemini-2.5-flash', 'gemini-2.5-flash']),
-    ['gemini-2.5-flash', ...SUPPORTED_DOCUMENT_FALLBACKS]);
+    [...SUPPORTED_DOCUMENT_FALLBACKS]);
   assert.deepEqual(candidateModels([null, '', SAFE_DOCUMENT_MODEL]),
     [...SUPPORTED_DOCUMENT_FALLBACKS]);
+  assert.deepEqual(candidateModels(['gemini-2.5-flash-lite'], null, 'ocr'),
+    [SAFE_DOCUMENT_MODEL, 'gemini-3.8-flash','gemini-3.1-flash-lite',
+      'gemini-3.6-flash']);
 });
 
 test('404 and transient errors try another model but not another API key', () => {
@@ -67,11 +71,31 @@ test('transient status retry is bounded and never retries credentials or quota',
 });
 
 test('model schema failures never count as valid vacancy analysis', () => {
-  assert.equal(expectedGeminiShape('job', {requirements:[]}), true);
+  assert.equal(expectedGeminiShape('job', {requirements:[]}), false);
+  assert.equal(expectedGeminiShape('job', {requirements:[{},{}]}), true);
   assert.equal(expectedGeminiShape('job', {message:'Hello'}), false);
   assert.equal(expectedGeminiShape('job', []), false);
   const cv = {candidate:{skills:[],experience:[],education:[]},
     document:{raw_text:'real document'}, sections:{}};
   assert.equal(expectedGeminiShape('ocr',cv),true);
   assert.equal(expectedGeminiShape('ocr',{candidate:{},document:{}}),false);
+});
+
+test('model discovery filters uncallable, legacy and unrelated Gemini models', () => {
+  const inventory = listedContentModels({models:[
+    {name:'models/gemini-2.5-flash-lite',supportedGenerationMethods:['generateContent']},
+    {name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},
+    {name:'models/gemini-3.5-flash-lite',supportedGenerationMethods:['generateContent']},
+    {name:'models/gemini-3.8-flash-image',supportedGenerationMethods:['generateContent']},
+    {name:'models/gemini-3.1-flash-lite',supportedGenerationMethods:['countTokens']},
+    {name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},
+  ]});
+  assert.deepEqual(inventory,['gemini-3.8-flash','gemini-3.5-flash-lite']);
+  assert.deepEqual(candidateModels(['gemini-2.5-flash-lite'],inventory,'job'),
+    ['gemini-3.8-flash','gemini-3.5-flash-lite']);
+  assert.deepEqual(candidateModels(['gemini-3.6-flash'],inventory,'ocr'),
+    ['gemini-3.5-flash-lite','gemini-3.8-flash']);
+  assert.equal(textGenerationModel('gemini-2.5-flash-lite'),null);
+  assert.equal(textGenerationModel('gemini-3.8-flash-image'),null);
+  assert.deepEqual(listedContentModels({models:[]}),[]);
 });
