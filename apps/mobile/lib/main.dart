@@ -103,9 +103,11 @@ class _NewAnalysisScreenState extends State<NewAnalysisScreen> {
       await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => AnalysisStatusScreen(analysisId: id),
       ));
+    } on AnalysisSubmissionException catch (e) {
+      if (mounted) setState(() => _uploadMessage = e.message);
     } catch (_) {
       if (mounted) setState(() => _uploadMessage =
-        'Unable to start the analysis. Check your connection, plan quota and API configuration.');
+        'Unable to start the analysis. Check your connection and try again.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
