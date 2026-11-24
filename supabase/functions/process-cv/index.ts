@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
 import { evaluateV2, EXTRACTION_PROMPT, JOB_PROMPT } from "./scoring.ts";
 import { activeGeminiKeys, keyAtSlot } from "./gemini_key_rotation.ts";
-import { candidateModels, classifyGeminiHttp, finalGeminiError } from "./gemini_model_policy.ts";
+import { candidateModels, classifyGeminiHttp, finalGeminiError, canRetryTransientStatus, transientBackoffMs, expectedGeminiShape } from "./gemini_model_policy.ts";
 
 // An authenticated one-job processor; not a replacement for an always-on
 // worker. Free Supabase Edge Functions have strict runtime limits.
@@ -76,73 +76,113 @@ async function askGemini(
   parts: unknown[],
   instruction: string,
 ) {
-  const primary = Deno.env.get(task === "ocr"
+  const preferred = Deno.env.get(task === "ocr"
     ? "GEMINI_MODEL_OCR" : "GEMINI_MODEL_ANALYSIS");
+  // Configured choices are attempted first, followed by supported Gemini 3
+  // model families. A Google project may not have access to legacy 2.5 models.
   const models = candidateModels([
-    primary, Deno.env.get("GEMINI_MODEL_FALLBACK"),
+    preferred, Deno.env.get("GEMINI_MODEL_FALLBACK"),
     Deno.env.get("GEMINI_MODEL_TERTIARY"),
   ]);
   const keys = activeGeminiKeys((name) => Deno.env.get(name));
   if (!keys.length || !models.length) throw new Error("gemini_not_configured");
 
-  // The RPC returns a 1-based slot, never a Gemini key or credential.
+  // Atomic allocation is global across Edge Function instances.
+  // Never store or return the API key or request payload.
   const allocated = await admin.rpc("cv_ats_next_gemini_slot", {
     p_active_slots: keys.length,
   });
   if (allocated.error || typeof allocated.data !== "number") {
-    console.error("Gemini key-slot allocation unavailable", {
+    console.error("Gemini slot allocation failed", {
       code: allocated.error?.code ?? "invalid_slot",
     });
     throw new Error("gemini_dispatch_unavailable");
   }
   const apiKey = keyAtSlot(keys, allocated.data);
-
   const providerStatuses: number[] = [];
-  for (let offset = 0; offset < models.length; offset++) {
-    const model = models[offset];
-    const urlGemini = "https://generativelanguage.googleapis.com/v1beta/models/" +
+  const deadline = Date.now() + 52_000;
+  const pause = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+    const model = models[modelIndex];
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
       encodeURIComponent(model) + ":generateContent";
-    let r: Response;
-    try {
-      r = await fetch(urlGemini, {
-        method: "POST",
-        signal: AbortSignal.timeout(40_000),
-        headers: { "Content-Type": "application/json",
-          "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          systemInstruction: { parts: [{ text: instruction }] },
-          generationConfig: { responseMimeType: "application/json" },
-        }),
-      });
-    } catch {
-      // A network or timeout error, never log CV content or credentials.
-      console.warn("Gemini provider network error", {task, attempt:offset + 1});
-      if (offset < models.length - 1) continue;
-      throw new Error("gemini_unavailable");
+
+    for (let retry = 0; retry <= 2; retry++) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1_500) throw new Error("gemini_unavailable");
+
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          signal: AbortSignal.timeout(Math.min(24_000, remaining - 500)),
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{role:"user",parts}],
+            systemInstruction: {parts:[{text:instruction}]},
+            generationConfig: {
+              responseMimeType:"application/json",
+              maxOutputTokens:12_288,
+            },
+          }),
+        });
+      } catch {
+        // No CV text, token, key value or provider body in the logs.
+        console.warn("Gemini network or timeout failure", {
+          task, model, modelIndex, retry, keySlot:allocated.data,
+        });
+        if (retry < 2 && deadline - Date.now() > 3_000) {
+          await pause(transientBackoffMs(retry, Math.random()));
+          continue;
+        }
+        if (modelIndex < models.length - 1) break;
+        throw new Error("gemini_unavailable");
+      }
+
+      if (!response.ok) {
+        providerStatuses.push(response.status);
+        console.warn("Gemini provider rejected request", {
+          task, model, httpStatus:response.status, retry,
+          keySlot:allocated.data,
+        });
+        const action = classifyGeminiHttp(response.status);
+        // Never rotate Gemini keys on rate limit: project quotas are shared.
+        if (action === "rate_limited") throw new Error("rate_limited");
+        if (action === "configuration") throw new Error("gemini_config_error");
+        if (canRetryTransientStatus(response.status) && retry < 2 &&
+            deadline - Date.now() > 3_000) {
+          await pause(transientBackoffMs(retry, Math.random()));
+          continue;
+        }
+        if (action === "next_model" && modelIndex < models.length - 1) break;
+        throw new Error(finalGeminiError(providerStatuses));
+      }
+
+      let result: unknown;
+      try {
+        const payload = await response.json();
+        const raw: string = payload?.candidates?.[0]?.content?.parts
+          ?.map((part: {text?: string}) => part.text ?? "").join("") ?? "";
+        result = raw ? JSON.parse(raw) : null;
+      } catch {
+        result = null;
+      }
+      if (!expectedGeminiShape(task, result)) {
+        console.warn("Gemini output missing required structured fields", {
+          task, model, keySlot:allocated.data,
+        });
+        if (modelIndex < models.length - 1) break;
+        throw new Error(task === "job" ? "invalid_job_json" : "invalid_cv_json");
+      }
+      return {data:result, model};
     }
-    if (!r.ok) {
-      providerStatuses.push(r.status);
-      // Log only status and attempt, never tokens, requests, CV text, or response body.
-      console.warn("Gemini provider rejected request", {
-        task, attempt:offset + 1, httpStatus:r.status,
-      });
-      const action = classifyGeminiHttp(r.status);
-      // Respect per-Google-project quota: no alternate key or model on 429.
-      if (action === "rate_limited") throw new Error("rate_limited");
-      if (action === "configuration") throw new Error("gemini_config_error");
-      // If an older model is unavailable (404), try the next configured
-      // model and finally Google's supported document fallback. Same key.
-      if (action === "next_model" && offset < models.length - 1) continue;
-      throw new Error(finalGeminiError(providerStatuses));
-    }
-    const payload = await r.json();
-    const raw = payload?.candidates?.[0]?.content?.parts
-      ?.map((p: {text?: string}) => p.text ?? "").join("") ?? "";
-    if (!raw) throw new Error("empty_gemini_reply");
-    return { data: JSON.parse(raw), model };
   }
-  throw new Error("gemini_unavailable");
+  throw new Error(finalGeminiError(providerStatuses));
 }
 async function run(analysisId: string, admin: ReturnType<typeof createClient>) {
   try {
